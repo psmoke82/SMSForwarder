@@ -156,13 +156,11 @@ fun NavGraph(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                HorizontalDivider()
-
                 Text(
-                    text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                    text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) • ${BuildConfig.BUILD_DATE}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
                 )
             }
         }

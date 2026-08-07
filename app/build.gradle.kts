@@ -1,3 +1,7 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -25,6 +29,8 @@ android {
         val commitCount = getGitCommitCount()
         versionCode = commitCount
         versionName = "1.0.$commitCount"
+        val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        buildConfigField("String", "BUILD_DATE", "\"$currentDate\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
