@@ -1,5 +1,9 @@
 # 📱 SMSForwarder (SMS & 알림 자동 포워딩 앱)
 
+![GitHub Tag](https://img.shields.io/github/v/tag/psmoke82/SMSForwarder?color=blue&label=version)
+![Android](https://img.shields.io/badge/Android-8.0%2B-green)
+![License](https://img.shields.io/badge/License-MIT-orange)
+
 **SMSForwarder**는 수신된 SMS 문자 메시지 및 단말기의 다양한 앱(카카오톡, 은행/카드사 결제 알림 등) 알림을 실시간 감지하여 지정된 수신 번호로 자동 포워딩해주는 Android 애플리케이션입니다.
 
 ---

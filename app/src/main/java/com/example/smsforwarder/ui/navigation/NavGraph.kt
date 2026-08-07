@@ -36,6 +36,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.smsforwarder.BuildConfig
 import com.example.smsforwarder.ui.MainViewModel
 import com.example.smsforwarder.ui.screen.BackupRestoreScreen
 import com.example.smsforwarder.ui.screen.ExecutionModeScreen
@@ -151,6 +152,17 @@ fun NavGraph(
                     selected = currentRoute == Screen.BackupRestore.route,
                     onClick = { navigateFromDrawer(Screen.BackupRestore.route) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                HorizontalDivider()
+
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
         }
