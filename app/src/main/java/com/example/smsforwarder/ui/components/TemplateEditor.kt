@@ -48,9 +48,17 @@ fun TemplateEditor(
     val templateParser = remember { TemplateParser() }
 
     val sampleMeta = remember(filterName, appName) {
+        val singleAppName = if (appName.isBlank()) {
+            "신한SOL"
+        } else {
+            appName.split(",")
+                .map { it.trim() }
+                .firstOrNull { it.isNotBlank() } ?: "신한SOL"
+        }
+
         NotificationMeta(
             filterName = if (filterName.isBlank()) "카드 알림 필터" else filterName,
-            appName = if (appName.isBlank()) "신한SOL" else appName,
+            appName = singleAppName,
             title = "[신한카드] 승인",
             body = "김*우 15,400원 일시불 08/04 20:45",
             subText = "체크카드 잔액 125,000원",

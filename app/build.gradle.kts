@@ -47,13 +47,16 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
+    }}
 
-    applicationVariants.all {
-        val variant = this
-        variant.outputs.all {
-            val output = this as com.android.build.gradle.api.BaseVariantOutputImpl
-            output.outputFileName = "SMSForwarder-v${variant.versionName}-rel.apk"
+androidComponents {
+    onVariants { variant ->
+        val commitCount = getGitCommitCount()
+        val fileName = "SMSForwarder-v1.0.$commitCount-rel.apk"
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                output.outputFileName.set(fileName)
+            }
         }
     }
 }
