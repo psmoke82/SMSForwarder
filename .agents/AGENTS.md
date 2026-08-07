@@ -2,13 +2,16 @@
 
 ## Release & GitHub Workflow Rules
 
-1. **자동 커밋 & 깃허브 푸시**:
-   - 코드 수정을 마칠 때마다 `git add .`, `git commit -m "..."`, `git push origin main` 명령을 통해 깃허브 메인 브랜치에 항상 최신 소스코드를 업로드합니다.
+1. **개발 및 소스 수정 단계 (수동 배포 모드)**:
+   - 사용자의 개별 수정/개선 요청 시에는 매번 버전업, 빌드, 깃허브 푸시, 릴리즈를 수행하지 않고 소스코드 변경사항을 누적합니다.
 
-2. **버전 명명 규칙 & 자동 릴리즈 태그 생성**:
-   - APK 빌드 시 파일명은 버전과 타입을 포함하여 `SMSForwarder-v1.0.[커밋수]-rel.apk` (예: `SMSForwarder-v1.0.8-rel.apk`) 형식으로 자동 생성합니다.
-   - 커밋 후 현재 커밋 수(`git rev-list --count HEAD`)에 맞춰 버전 태그(`v1.0.[커밋수]`)를 자동 생성하고 `git push origin [태그명]`으로 푸시합니다.
-
-3. **변경 내역(Changelog) 작성 및 릴리즈 노트/바이너리 등록**:
-   - `CHANGELOG.md` 파일에 이번 버전의 세부 변경 내역(기능 추가, UI 개선, 버그 수정 등)을 명확하게 업데이트합니다.
-   - `SMSForwarder-v1.0.[커밋수]-rel.apk` 바이너리 업로드와 함께 깃허브 Release를 자동 게시하고, 사용자에게 릴리즈 페이지 링크 및 상세 **Release Notes** 전문을 제공합니다.
+2. **명시적 릴리즈/배포 요청 시 일괄 작업 (Batch Release)**:
+   - 사용자가 "배포해줘", "릴리즈해줘", "버전 올려서 깃허브 등록해줘" 등 **명시적으로 릴리즈를 요청할 때에만** 아래 일련의 릴리즈 작업을 한 번에 수행합니다:
+     1. 누적 변경사항 `git add .` 및 `git commit -m "..."`
+     2. 현재 Git 커밋 수(`git rev-list --count HEAD`) 기반으로 버전 산출 (`v1.0.[커밋수]`)
+     3. APK 자동 빌드 (`SMSForwarder-v1.0.[커밋수]-rel.apk`)
+     4. `git push origin main` 소스코드 푸시
+     5. 버전 태그(`v1.0.[커밋수]`) 생성 및 `git push origin --tags` 푸시
+     6. `CHANGELOG.md` 문서에 묶인 마이너 개선 내역 한눈에 정리
+     7. GitHub Release 게시 및 `SMSForwarder-v1.0.[커밋수]-rel.apk` 바이너리 업로드
+     8. 사용자에게 릴리즈 링크, APK 직접 다운로드 링크, Release Notes 전문 제공
