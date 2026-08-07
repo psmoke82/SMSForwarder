@@ -48,6 +48,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.api.BaseVariantOutputImpl
+            output.outputFileName = "SMSForwarder-v${variant.versionName}-rel.apk"
+        }
+    }
 }
 
 dependencies {
