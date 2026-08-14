@@ -50,4 +50,40 @@ class TemplateParserTest {
         assertTrue(actual.contains("20:45"))
         assertTrue(actual.contains("화"))
     }
+
+    @Test
+    fun testSummationTotalsPlaceholdersReplacement() {
+        val meta = NotificationMeta(
+            filterName = "카드필터",
+            appName = "신한SOL",
+            title = "카드승인",
+            body = "10,000원 결제완료",
+            monthlyTotal = 1250000L,
+            yearlyTotal = 15000000L
+        )
+
+        val template = "[%fn%] 당월합계: %mtot%원 / 연간합계: %ytot%원"
+        val expected = "[카드필터] 당월합계: 1,250,000원 / 연간합계: 15,000,000원"
+
+        val actual = parser.parse(template, meta)
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun testPeriodLabelPlaceholdersReplacement() {
+        val meta = NotificationMeta(
+            filterName = "카드필터",
+            appName = "신한SOL",
+            title = "카드승인",
+            body = "10,000원 결제완료",
+            monthlyPeriodLabel = "26.08",
+            yearlyPeriodLabel = "26"
+        )
+
+        val template = "[%mtit%월 / %ytit%년]"
+        val expected = "[26.08월 / 26년]"
+
+        val actual = parser.parse(template, meta)
+        assertEquals(expected, actual)
+    }
 }

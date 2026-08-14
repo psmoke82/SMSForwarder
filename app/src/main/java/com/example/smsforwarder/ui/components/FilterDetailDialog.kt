@@ -65,7 +65,12 @@ fun FilterDetailDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
-                DetailItem(label = "필터 상태", value = if (filter.isActive) "활성화 (전달 중)" else "비활성화")
+                val summationStatusText = if (filter.isSummationEnabled) {
+                    "활성화 (당월: ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(filter.monthlyTotal)}원 / 연간: ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(filter.yearlyTotal)}원)"
+                } else {
+                    "비활성화 (미사용)"
+                }
+                DetailItem(label = "금액합산 기능", value = summationStatusText)
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

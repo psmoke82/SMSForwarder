@@ -50,6 +50,42 @@ class FilterEvaluatorTest {
     }
 
     @Test
+    fun testCatchAllFilter_excludesNativeSms() {
+        val filter = Filter(
+            id = 4,
+            name = "전체 앱 필터",
+            targetPackageNames = emptyList(),
+            keywords = emptyList(),
+            keywordLogic = KeywordLogic.OR,
+            recipientPhoneNumber = "01012345678",
+            messageTemplate = "%mb%",
+            isActive = true
+        )
+
+        // 대상 앱을 지정하지 않은 "전체 앱" 필터는 알림 앱만 대상으로 하며,
+        // 앱 선택 화면에 존재하지 않는 기본 문자(네이티브 SMS)는 제외되어야 한다.
+        assertFalse(evaluator.isMatch(filter, FilterEvaluator.NATIVE_SMS_PACKAGE, "발신자", "본문"))
+        // 일반 알림 앱은 그대로 매칭되어야 한다.
+        assertTrue(evaluator.isMatch(filter, "com.any.app", "발신자", "본문"))
+    }
+
+    @Test
+    fun testExplicitNativeSmsTarget_stillMatches() {
+        val filter = Filter(
+            id = 5,
+            name = "기본 문자 명시 지정",
+            targetPackageNames = listOf("기본 문자"),
+            keywords = emptyList(),
+            keywordLogic = KeywordLogic.OR,
+            recipientPhoneNumber = "01012345678",
+            messageTemplate = "%mb%",
+            isActive = true
+        )
+
+        assertTrue(evaluator.isMatch(filter, FilterEvaluator.NATIVE_SMS_PACKAGE, "발신자", "본문"))
+    }
+
+    @Test
     fun testInactiveFilter() {
         val filter = Filter(
             id = 3,

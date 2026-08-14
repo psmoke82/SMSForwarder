@@ -11,5 +11,10 @@ data class ForwardLog(
     val parsedMessage: String,
     val recipientNumber: String,
     val isSuccess: Boolean,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isSummationEnabled: Boolean = false,
+    val extractedAmountKRW: Long = 0L,
+    val originalCurrencyCode: String? = null,
+    val originalForeignAmount: Double? = null,
+    val appliedExchangeRate: Double? = null
 )

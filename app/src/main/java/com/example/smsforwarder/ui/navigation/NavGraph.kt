@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import com.example.smsforwarder.ui.screen.ExecutionModeScreen
 import com.example.smsforwarder.ui.screen.FilterEditScreen
 import com.example.smsforwarder.ui.screen.FilterListScreen
 import com.example.smsforwarder.ui.screen.LogListScreen
+import com.example.smsforwarder.ui.screen.MonthlySummaryScreen
 import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
@@ -51,6 +53,7 @@ sealed class Screen(val route: String) {
         fun createRoute(filterId: Long = 0L) = "filter_edit?filterId=$filterId"
     }
     object LogList : Screen("log_list")
+    object MonthlySummary : Screen("monthly_summary")
     object ExecutionMode : Screen("execution_mode")
     object BackupRestore : Screen("backup_restore")
 }
@@ -147,6 +150,14 @@ fun NavGraph(
                 )
 
                 NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
+                    label = { Text("월간 금액합산 확인") },
+                    selected = currentRoute == Screen.MonthlySummary.route,
+                    onClick = { navigateFromDrawer(Screen.MonthlySummary.route) },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
                     icon = { Icon(Icons.Default.CloudSync, contentDescription = null) },
                     label = { Text("백업 및 복구 기능") },
                     selected = currentRoute == Screen.BackupRestore.route,
@@ -209,6 +220,13 @@ fun NavGraph(
 
             composable(Screen.LogList.route) {
                 LogListScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = safePopBack
+                )
+            }
+
+            composable(Screen.MonthlySummary.route) {
+                MonthlySummaryScreen(
                     viewModel = viewModel,
                     onNavigateBack = safePopBack
                 )

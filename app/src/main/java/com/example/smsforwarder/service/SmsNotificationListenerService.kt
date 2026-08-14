@@ -71,7 +71,10 @@ class SmsNotificationListenerService : NotificationListenerService() {
         }
 
         // 2) Cross-service deduplication with SmsReceiver
-        val rawKey = MessageDeduplicator.createKey("RAW", title, body)
+        // Body-only key: SMS sender numbers and notification titles rarely match for the
+        // same physical message, so keying on the (near-)identical body text is what
+        // actually lets this recognize a message SmsReceiver already processed.
+        val rawKey = MessageDeduplicator.createKey("RAW", "", body)
         if (MessageDeduplicator.isDuplicate(rawKey)) {
             Log.w("SmsNotificationListener", "[SMS-알림 중복 차단] SmsReceiver에서 이미 처리된 동일 SMS 메시지 알림입니다. (앱: $appName, 제목: $title)")
             return
@@ -115,44 +118,94 @@ class SmsNotificationListenerService : NotificationListenerService() {
             return
         }
 
+        val exchangeRateRepository = com.example.smsforwarder.data.repository.ExchangeRateRepositoryImpl(applicationContext)
+        val amountExtractor = com.example.smsforwarder.domain.parser.AmountExtractor(exchangeRateRepository)
+
         var matchedCount = 0
 
-        for (filter in activeFilters) {
-            if (filterEvaluator.isMatch(filter, packageName, title, body)) {
+        for (initialFilter in activeFilters) {
+            if (filterEvaluator.isMatch(initialFilter, packageName, title, body)) {
                 matchedCount++
-                Log.i(tag, "[필터 매칭 성공] 적용 필터명: '${filter.name}' ➔ 수신자 번호: ${filter.recipientPhoneNumber}")
+                Log.i(tag, "[필터 매칭 성공] 적용 필터명: '${initialFilter.name}' ➔ 수신자 번호: ${initialFilter.recipientPhoneNumber}")
+
+                // 1~3. Amount Extraction & Atomic Period-Reset + Accumulation
+                var currentFilter = initialFilter
+                var extractionResult = com.example.smsforwarder.domain.parser.AmountExtractionResult(amountKRW = 0L)
+                if (initialFilter.isSummationEnabled) {
+                    extractionResult = amountExtractor.extractDetailed(body)
+                    val engine = com.example.smsforwarder.domain.parser.SummationPeriodEngine
+                    val eventCal = java.util.Calendar.getInstance().apply {
+                        timeInMillis = timestamp
+                        set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
+                    }
+                    val currentMonthlyCycleStart = engine.getMonthlyCycleStartTimestamp(eventCal, initialFilter)
+                    val currentYearlyCycleStart = engine.getYearlyCycleStartTimestamp(timestamp)
+                    // Atomic DB-side reset-check + increment — avoids the lost-update race
+                    // that a separate read/compute/write would have if two matching
+                    // messages for this filter arrive at nearly the same time.
+                    database.filterDao().applySummationDelta(
+                        filterId = initialFilter.id,
+                        amountDelta = extractionResult.amountKRW,
+                        currentMonthlyCycleStart = currentMonthlyCycleStart,
+                        currentYearlyCycleStart = currentYearlyCycleStart
+                    )
+                    currentFilter = database.filterDao().getFilterById(initialFilter.id)?.toDomain() ?: initialFilter
+                    if (extractionResult.amountKRW != 0L) {
+                        Log.i(tag, "[금액 합산 적용] 필터: '${currentFilter.name}' | 결제액: ${extractionResult.amountKRW}원 | 당월 합계: ${currentFilter.monthlyTotal}원")
+                        val periodLabel = java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA).format(java.util.Date(currentMonthlyCycleStart))
+                        database.filterMonthlySummaryDao().incrementAmount(
+                            filterId = initialFilter.id,
+                            filterName = currentFilter.name,
+                            periodLabel = periodLabel,
+                            periodStartTimestamp = currentMonthlyCycleStart,
+                            amountDelta = extractionResult.amountKRW
+                        )
+                    }
+                }
 
                 val meta = NotificationMeta(
-                    filterName = filter.name,
+                    filterName = currentFilter.name,
                     appName = appName,
                     title = title,
                     body = body,
                     subText = subText,
-                    timestamp = timestamp
+                    timestamp = timestamp,
+                    monthlyTotal = currentFilter.monthlyTotal,
+                    yearlyTotal = currentFilter.yearlyTotal,
+                    monthlyPeriodLabel = com.example.smsforwarder.domain.parser.SummationPeriodEngine.getMonthlyPeriodLabel(currentFilter, timestamp),
+                    yearlyPeriodLabel = com.example.smsforwarder.domain.parser.SummationPeriodEngine.getYearlyPeriodLabel(currentFilter, timestamp)
                 )
 
-                // 3. Template parsing
-                val parsedMessage = templateParser.parse(filter.messageTemplate, meta)
+                // 4. Template parsing
+                val parsedMessage = templateParser.parse(currentFilter.messageTemplate, meta)
                 Log.d(tag, "[3단계: 템플릿 가공 완료] 최종 전달 문자:\n$parsedMessage")
 
-                // 4. Send SMS
-                val sendResult = smsSender.sendSms(filter.recipientPhoneNumber, parsedMessage)
+                // 5. Send SMS
+                val sendResult = smsSender.sendSms(currentFilter.recipientPhoneNumber, parsedMessage)
 
                 val logEntity = LogEntity(
                     timestamp = timestamp,
-                    filterName = filter.name,
+                    filterName = currentFilter.name,
                     appName = appName,
                     packageName = packageName,
                     rawTitle = title,
                     rawBody = body,
                     parsedMessage = parsedMessage,
-                    recipientNumber = filter.recipientPhoneNumber,
+                    recipientNumber = currentFilter.recipientPhoneNumber,
                     isSuccess = sendResult.isSuccess,
-                    errorMessage = sendResult.exceptionOrNull()?.localizedMessage
+                    errorMessage = sendResult.exceptionOrNull()?.localizedMessage,
+                    isSummationEnabled = currentFilter.isSummationEnabled,
+                    extractedAmountKRW = extractionResult.amountKRW,
+                    originalCurrencyCode = extractionResult.currencyCode,
+                    originalForeignAmount = extractionResult.foreignAmount,
+                    appliedExchangeRate = extractionResult.exchangeRate
                 )
 
                 database.logDao().insertLog(logEntity)
-                Log.i(tag, "[4단계: 포워딩 처리 완료] 필터 '${filter.name}' SMS 전송 결과: ${if (sendResult.isSuccess) "성공" else "실패"}")
+                Log.i(tag, "[4단계: 포워딩 처리 완료] 필터 '${currentFilter.name}' SMS 전송 결과: ${if (sendResult.isSuccess) "성공" else "실패"}")
             }
         }
 

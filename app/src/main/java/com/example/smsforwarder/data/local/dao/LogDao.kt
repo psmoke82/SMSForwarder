@@ -22,7 +22,7 @@ interface LogDao {
         WHERE id NOT IN (
             SELECT id FROM forward_logs 
             ORDER BY timestamp DESC 
-            LIMIT 200
+            LIMIT 20000
         )
     """)
     suspend fun pruneOldLogs()

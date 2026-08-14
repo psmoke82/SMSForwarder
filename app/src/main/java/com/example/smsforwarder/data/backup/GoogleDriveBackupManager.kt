@@ -3,6 +3,7 @@ package com.example.smsforwarder.data.backup
 import android.content.Context
 import com.example.smsforwarder.data.model.BackupPayload
 import com.example.smsforwarder.domain.model.Filter
+import com.example.smsforwarder.domain.model.MonthlySummaryEntry
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.ByteArrayContent
@@ -44,18 +45,17 @@ class GoogleDriveBackupManager(private val context: Context) {
         ).setApplicationName("SMSForwarder").build()
     }
 
-    suspend fun uploadBackup(account: GoogleSignInAccount, filters: List<Filter>): Result<Unit> {
-        return uploadBackupInternal(getDriveService(account), filters)
+    suspend fun uploadBackup(account: GoogleSignInAccount, filters: List<Filter>, monthlySummaries: List<MonthlySummaryEntry> = emptyList()): Result<Unit> {
+        return uploadBackupInternal(getDriveService(account), filters, monthlySummaries)
     }
 
-    suspend fun uploadBackupByEmail(accountEmail: String, filters: List<Filter>): Result<Unit> {
-        return uploadBackupInternal(getDriveServiceByEmail(accountEmail), filters)
+    suspend fun uploadBackupByEmail(accountEmail: String, filters: List<Filter>, monthlySummaries: List<MonthlySummaryEntry> = emptyList()): Result<Unit> {
+        return uploadBackupInternal(getDriveServiceByEmail(accountEmail), filters, monthlySummaries)
     }
 
-    private suspend fun uploadBackupInternal(driveService: Drive, filters: List<Filter>): Result<Unit> = withContext(Dispatchers.IO) {
+    private suspend fun uploadBackupInternal(driveService: Drive, filters: List<Filter>, monthlySummaries: List<MonthlySummaryEntry>): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val payload = BackupPayload(filters = filters)
-            val jsonContent = gson.toJson(payload)
+            val jsonContent = BackupMigrator.createBackupJson(filters, monthlySummaries)
 
             val fileList = driveService.files().list()
                 .setSpaces("appDataFolder")
@@ -80,15 +80,15 @@ class GoogleDriveBackupManager(private val context: Context) {
         }
     }
 
-    suspend fun downloadBackup(account: GoogleSignInAccount): Result<List<Filter>> {
+    suspend fun downloadBackup(account: GoogleSignInAccount): Result<BackupImportResult> {
         return downloadBackupInternal(getDriveService(account))
     }
 
-    suspend fun downloadBackupByEmail(accountEmail: String): Result<List<Filter>> {
+    suspend fun downloadBackupByEmail(accountEmail: String): Result<BackupImportResult> {
         return downloadBackupInternal(getDriveServiceByEmail(accountEmail))
     }
 
-    private suspend fun downloadBackupInternal(driveService: Drive): Result<List<Filter>> = withContext(Dispatchers.IO) {
+    private suspend fun downloadBackupInternal(driveService: Drive): Result<BackupImportResult> = withContext(Dispatchers.IO) {
         try {
             val fileList = driveService.files().list()
                 .setSpaces("appDataFolder")
@@ -104,13 +104,7 @@ class GoogleDriveBackupManager(private val context: Context) {
             driveService.files().get(fileId).executeMediaAndDownloadTo(outputStream)
 
             val jsonContent = outputStream.toString("UTF-8")
-            val payload = gson.fromJson(jsonContent, BackupPayload::class.java)
-
-            if (payload?.filters != null) {
-                Result.success(payload.filters)
-            } else {
-                Result.failure(Exception("백업 파일 구조가 올바르지 않습니다."))
-            }
+            BackupMigrator.parseAndMigrate(jsonContent)
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -23,6 +23,10 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +35,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
@@ -40,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +71,26 @@ fun LogListScreen(
     val logs by viewModel.logs.collectAsState()
     val context = LocalContext.current
     var showClearDialog by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredLogs by remember {
+        derivedStateOf {
+            val query = searchQuery.trim()
+            if (query.isBlank()) {
+                logs
+            } else {
+                logs.filter { log ->
+                    log.filterName.contains(query, ignoreCase = true) ||
+                        log.appName.contains(query, ignoreCase = true) ||
+                        log.packageName.contains(query, ignoreCase = true) ||
+                        log.rawTitle.contains(query, ignoreCase = true) ||
+                        log.rawBody.contains(query, ignoreCase = true) ||
+                        log.parsedMessage.contains(query, ignoreCase = true) ||
+                        log.recipientNumber.contains(query, ignoreCase = true)
+                }
+            }
+        }
+    }
 
     if (showClearDialog) {
         AlertDialog(
@@ -96,7 +122,7 @@ fun LogListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("포워딩 실행 기록 (${logs.size}/200건)") },
+                title = { Text("포워딩 실행 기록 (${logs.size}/20000건)") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -118,29 +144,49 @@ fun LogListScreen(
             )
         }
     ) { innerPadding ->
-        if (logs.isEmpty()) {
-            Column(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "포워딩 실행 기록이 없습니다.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(logs, key = { it.id }) { log ->
-                    LogItemCard(log = log)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("필터명, 앱이름, 메시지 내용으로 검색") },
+                singleLine = true,
+                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(imageVector = Icons.Default.Clear, contentDescription = "검색어 지우기")
+                        }
+                    }
+                }
+            )
+
+            if (filteredLogs.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = if (logs.isEmpty()) "포워딩 실행 기록이 없습니다." else "검색 결과가 없습니다.",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredLogs, key = { it.id }) { log ->
+                        LogItemCard(log = log)
+                    }
                 }
             }
         }
@@ -172,7 +218,7 @@ fun LogItemCard(log: ForwardLog) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Text(
-                        text = log.appName.ifBlank { log.packageName },
+                        text = log.filterName,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -224,13 +270,41 @@ fun LogItemCard(log: ForwardLog) {
             Spacer(modifier = Modifier.height(2.dp))
 
             Text(
-                text = "필터: ${log.filterName}  ➔  수신번호: $formattedRecipient",
+                text = "필터: ${log.appName.ifBlank { log.packageName }}  ➔  수신번호: $formattedRecipient",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
+                    if (log.isSummationEnabled && log.extractedAmountKRW != 0L) {
+                        val amountText = remember(log.extractedAmountKRW, log.originalCurrencyCode, log.originalForeignAmount, log.appliedExchangeRate) {
+                            val krwFormatted = java.text.NumberFormat.getNumberInstance(Locale.KOREA).format(log.extractedAmountKRW)
+                            val code = log.originalCurrencyCode
+                            val foreignAmount = log.originalForeignAmount
+                            val rate = log.appliedExchangeRate
+                            if (code != null && foreignAmount != null && rate != null) {
+                                val foreignFormatted = java.text.NumberFormat.getNumberInstance(Locale.KOREA).apply {
+                                    minimumFractionDigits = 0
+                                    maximumFractionDigits = 2
+                                }.format(foreignAmount)
+                                val rateFormatted = java.text.NumberFormat.getNumberInstance(Locale.KOREA).apply {
+                                    minimumFractionDigits = 0
+                                    maximumFractionDigits = 2
+                                }.format(rate)
+                                "인식된 금액: ${krwFormatted}원 ($code $foreignFormatted × 환율 $rateFormatted)"
+                            } else {
+                                "인식된 금액: ${krwFormatted}원"
+                            }
+                        }
+                        Text(
+                            text = amountText,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
                     Text(
                         text = "전달 메시지:\n${log.parsedMessage}",
                         style = MaterialTheme.typography.bodyMedium,

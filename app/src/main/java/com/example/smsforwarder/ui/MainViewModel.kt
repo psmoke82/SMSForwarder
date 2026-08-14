@@ -15,6 +15,7 @@ import com.example.smsforwarder.data.repository.ForwarderRepositoryImpl
 import com.example.smsforwarder.data.repository.UserPreferencesRepository
 import com.example.smsforwarder.domain.model.Filter
 import com.example.smsforwarder.domain.model.ForwardLog
+import com.example.smsforwarder.domain.model.MonthlySummaryEntry
 import com.example.smsforwarder.service.ForwarderForegroundService
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,7 +27,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: ForwarderRepository by lazy {
         val db = AppDatabase.getInstance(application)
-        ForwarderRepositoryImpl(db.filterDao(), db.logDao())
+        ForwarderRepositoryImpl(db.filterDao(), db.logDao(), db.filterMonthlySummaryDao())
     }
 
     private val preferencesRepository by lazy {
@@ -72,6 +73,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val logs: StateFlow<List<ForwardLog>> by lazy {
         repository.getAllLogs().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+    }
+
+    val monthlySummaries: StateFlow<List<MonthlySummaryEntry>> by lazy {
+        repository.getMonthlySummaries().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
@@ -125,12 +134,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    suspend fun saveFilterSync(filter: Filter): Long {
+        return try {
+            val savedId = repository.saveFilter(filter)
+            Log.d("MainViewModel", "Filter saved sync with id: $savedId, name: ${filter.name}")
+            savedId
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error saving filter sync", e)
+            0L
+        }
+    }
+
     fun toggleFilterActive(filter: Filter, isActive: Boolean = !filter.isActive) {
         viewModelScope.launch {
             try {
-                repository.saveFilter(filter.copy(isActive = isActive))
+                repository.setFilterActive(filter.id, isActive)
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error toggling filter active", e)
+            }
+        }
+    }
+
+    fun updateFilterOrders(orderedFilters: List<Filter>) {
+        viewModelScope.launch {
+            try {
+                val orderPairs = orderedFilters.mapIndexed { index, filter -> Pair(filter.id, index) }
+                repository.updateFilterOrders(orderPairs)
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error updating filter orders", e)
             }
         }
     }
@@ -177,6 +208,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Persists an imported filter list. Summation amounts and monthly-summary history are
+     * intentionally excluded from backups (see BackupMigrator) — restoring only ever brings
+     * back filter settings, never stale accumulated totals — so there is nothing to remap or
+     * restore beyond the filters themselves.
+     */
+    private suspend fun applyImportResult(importResult: com.example.smsforwarder.data.backup.BackupImportResult): Int {
+        importResult.filters.forEach { filter ->
+            repository.saveFilter(filter)
+        }
+        return importResult.filters.size
+    }
+
     // Local Backup & Restore
     fun exportLocalBackup(uri: Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
@@ -194,11 +238,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = localBackupManager.importFromUri(uri)
             if (result.isSuccess) {
-                val importedFilters = result.getOrDefault(emptyList())
-                importedFilters.forEach { filter ->
-                    repository.saveFilter(filter)
-                }
-                onResult(true, "${importedFilters.size}개의 필터가 복원되었습니다.")
+                val count = applyImportResult(result.getOrThrow())
+                onResult(true, "${count}개의 필터가 복원되었습니다.")
             } else {
                 onResult(false, result.exceptionOrNull()?.localizedMessage)
             }
@@ -223,11 +264,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = googleDriveBackupManager.downloadBackup(account)
             if (result.isSuccess) {
-                val importedFilters = result.getOrDefault(emptyList())
-                importedFilters.forEach { filter ->
-                    repository.saveFilter(filter)
-                }
-                onResult(true, "Google Drive에서 ${importedFilters.size}개의 필터를 복원했습니다.", null)
+                val count = applyImportResult(result.getOrThrow())
+                onResult(true, "Google Drive에서 ${count}개의 필터를 복원했습니다.", null)
             } else {
                 val ex = result.exceptionOrNull()
                 onResult(false, ex?.localizedMessage ?: ex?.toString(), ex)
@@ -252,11 +290,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = googleDriveBackupManager.downloadBackupByEmail(accountEmail)
             if (result.isSuccess) {
-                val importedFilters = result.getOrDefault(emptyList())
-                importedFilters.forEach { filter ->
-                    repository.saveFilter(filter)
-                }
-                onResult(true, "Google Drive에서 ${importedFilters.size}개의 필터를 복원했습니다.", null)
+                val count = applyImportResult(result.getOrThrow())
+                onResult(true, "Google Drive에서 ${count}개의 필터를 복원했습니다.", null)
             } else {
                 val ex = result.exceptionOrNull()
                 onResult(false, ex?.localizedMessage ?: ex?.toString(), ex)

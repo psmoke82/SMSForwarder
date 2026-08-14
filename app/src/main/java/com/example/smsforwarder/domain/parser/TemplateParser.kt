@@ -1,5 +1,6 @@
 package com.example.smsforwarder.domain.parser
 
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -11,7 +12,11 @@ data class NotificationMeta(
     val title: String = "",
     val body: String = "",
     val subText: String = "",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val monthlyTotal: Long = 0L,
+    val yearlyTotal: Long = 0L,
+    val monthlyPeriodLabel: String = "",
+    val yearlyPeriodLabel: String = ""
 )
 
 data class TemplateTag(
@@ -27,6 +32,10 @@ object TemplateTags {
         TemplateTag("%pni%", "알림 제목", "알림 상단 제목"),
         TemplateTag("%mb%", "메시지 본문", "알림 본문 텍스트"),
         TemplateTag("%nst%", "서브 텍스트", "알림 서브/추가 텍스트"),
+        TemplateTag("%mtot%", "월간 합계", "당월 누적 합계 금액 (쉼표 구분)"),
+        TemplateTag("%ytot%", "연간 합계", "연간 누적 합계 금액 (쉼표 구분)"),
+        TemplateTag("%mtit%", "월구간명", "월구간 시작 연.월 (예: 26.08)"),
+        TemplateTag("%ytit%", "연구간명", "연구간 연도 (예: 26)"),
         TemplateTag("%rt%", "수신 시각", "전체 날짜 시각 (yyyy-MM-dd HH:mm:ss)"),
         TemplateTag("%Y%", "연도", "4자리 연도 (yyyy)"),
         TemplateTag("%M%", "월", "2자리 월 (MM)"),
@@ -52,6 +61,10 @@ class TemplateParser {
         val minuteStr = SimpleDateFormat("mm", Locale.getDefault()).format(date)
         val fullTimeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(date)
 
+        val numberFormat = NumberFormat.getNumberInstance(Locale.KOREA)
+        val monthlyTotalStr = numberFormat.format(meta.monthlyTotal)
+        val yearlyTotalStr = numberFormat.format(meta.yearlyTotal)
+
         val dayOfWeekStr = when (cal.get(Calendar.DAY_OF_WEEK)) {
             Calendar.SUNDAY -> "일"
             Calendar.MONDAY -> "월"
@@ -71,6 +84,10 @@ class TemplateParser {
         result = result.replace("%pni%", meta.title).replace("%sender%", meta.title).replace("%title%", meta.title)
         result = result.replace("%mb%", meta.body).replace("%body%", meta.body).replace("%text%", meta.body)
         result = result.replace("%nst%", meta.subText)
+        result = result.replace("%mtot%", monthlyTotalStr)
+        result = result.replace("%ytot%", yearlyTotalStr)
+        result = result.replace("%mtit%", meta.monthlyPeriodLabel)
+        result = result.replace("%ytit%", meta.yearlyPeriodLabel)
         result = result.replace("%rt%", fullTimeStr)
 
         // Date/Time tags (support both %Y% and %Y)

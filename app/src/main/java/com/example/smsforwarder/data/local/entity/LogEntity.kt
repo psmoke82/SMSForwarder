@@ -17,7 +17,12 @@ data class LogEntity(
     val parsedMessage: String,
     val recipientNumber: String,
     val isSuccess: Boolean,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isSummationEnabled: Boolean = false,
+    val extractedAmountKRW: Long = 0L,
+    val originalCurrencyCode: String? = null,
+    val originalForeignAmount: Double? = null,
+    val appliedExchangeRate: Double? = null
 ) {
     fun toDomain(): ForwardLog {
         return ForwardLog(
@@ -31,7 +36,12 @@ data class LogEntity(
             parsedMessage = parsedMessage,
             recipientNumber = recipientNumber,
             isSuccess = isSuccess,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            isSummationEnabled = isSummationEnabled,
+            extractedAmountKRW = extractedAmountKRW,
+            originalCurrencyCode = originalCurrencyCode,
+            originalForeignAmount = originalForeignAmount,
+            appliedExchangeRate = appliedExchangeRate
         )
     }
 
@@ -48,7 +58,12 @@ data class LogEntity(
                 parsedMessage = log.parsedMessage,
                 recipientNumber = log.recipientNumber,
                 isSuccess = log.isSuccess,
-                errorMessage = log.errorMessage
+                errorMessage = log.errorMessage,
+                isSummationEnabled = log.isSummationEnabled,
+                extractedAmountKRW = log.extractedAmountKRW,
+                originalCurrencyCode = log.originalCurrencyCode,
+                originalForeignAmount = log.originalForeignAmount,
+                appliedExchangeRate = log.appliedExchangeRate
             )
         }
     }

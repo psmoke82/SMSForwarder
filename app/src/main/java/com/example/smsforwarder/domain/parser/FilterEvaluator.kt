@@ -8,13 +8,21 @@ class FilterEvaluator {
 
     companion object {
         const val NATIVE_SMS_PACKAGE = "android.provider.Telephony.SMS_RECEIVED"
+
+        private inline fun logD(tag: String, msg: String) {
+            runCatching { Log.d(tag, msg) }
+        }
+
+        private inline fun logI(tag: String, msg: String) {
+            runCatching { Log.i(tag, msg) }
+        }
     }
 
     fun isMatch(filter: Filter, packageName: String, title: String, body: String): Boolean {
         val tag = "FilterEvaluator"
 
         if (!filter.isActive) {
-            Log.d(tag, "[필터 스킵] '${filter.name}' (비활성화 상태)")
+            logD(tag, "[필터 스킵] '${filter.name}' (비활성화 상태)")
             return false
         }
 
@@ -40,9 +48,14 @@ class FilterEvaluator {
             }
 
             if (!matchesPackage) {
-                Log.d(tag, "[필터 미매칭] '${filter.name}' (대상 앱 불일치. 수신 앱: '$packageName', 필터 지정 앱: $validPackages)")
+                logD(tag, "[필터 미매칭] '${filter.name}' (대상 앱 불일치. 수신 앱: '$packageName', 필터 지정 앱: $validPackages)")
                 return false
             }
+        } else if (isNativeSms) {
+            // "전체 앱" 필터(대상 앱 미지정)는 앱 선택 화면에서 고를 수 있는 알림 앱들만 대상으로 하며,
+            // 선택 UI에 존재하지 않는 기본 문자(SMS_RECEIVED 브로드캐스트)는 명시적으로 지정하지 않는 한 매칭에서 제외한다.
+            logD(tag, "[필터 미매칭] '${filter.name}' (전체 앱 필터는 기본 문자를 자동으로 포함하지 않음)")
+            return false
         }
 
         val validKeywords = filter.keywords.map { it.trim() }.filter { it.isNotBlank() }
@@ -66,7 +79,7 @@ class FilterEvaluator {
         }
 
         if (!isKeywordMatch) {
-            Log.d(tag, "[필터 미매칭] '${filter.name}' (${filter.keywordLogic} 포착 키워드 미충족: $validKeywords)")
+            logD(tag, "[필터 미매칭] '${filter.name}' (${filter.keywordLogic} 포착 키워드 미충족: $validKeywords)")
             return false
         }
 
@@ -77,12 +90,12 @@ class FilterEvaluator {
                 combinedContent.contains(excludeKw, ignoreCase = true)
             }
             if (matchedExcludeKeyword != null) {
-                Log.i(tag, "[필터 스킵/전송 안함] '${filter.name}' (포착 키워드 만족했으나 제외 키워드 '$matchedExcludeKeyword' 포함됨)")
+                logI(tag, "[필터 스킵/전송 안함] '${filter.name}' (포착 키워드 만족했으나 제외 키워드 '$matchedExcludeKeyword' 포함됨)")
                 return false
             }
         }
 
-        Log.d(tag, "[필터 매칭 성공] '${filter.name}' (포착 조건 충족 및 제외 키워드 미포함)")
+        logD(tag, "[필터 매칭 성공] '${filter.name}' (포착 조건 충족 및 제외 키워드 미포함)")
         return true
     }
 }

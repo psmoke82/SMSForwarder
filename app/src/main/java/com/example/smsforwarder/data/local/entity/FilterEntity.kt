@@ -17,7 +17,19 @@ data class FilterEntity(
     val keywordLogic: String,
     val recipientPhoneNumber: String,
     val messageTemplate: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val isSummationEnabled: Boolean = false,
+    val startMonthOffset: Int = 0,
+    val startDayType: String = "SPECIFIC_DAY",
+    val startDayValue: Int = 1,
+    val endMonthOffset: Int = 0,
+    val endDayType: String = "SPECIFIC_DAY",
+    val endDayValue: Int = 31,
+    val monthlyTotal: Long = 0L,
+    val yearlyTotal: Long = 0L,
+    val lastMonthlyResetTime: Long = 0L,
+    val lastYearlyResetTime: Long = 0L,
+    val displayOrder: Int = 0
 ) {
     fun toDomain(): Filter {
         val packageList = if (targetPackageName.isBlank()) emptyList() else targetPackageName.split("|||")
@@ -33,7 +45,19 @@ data class FilterEntity(
             keywordLogic = runCatching { KeywordLogic.valueOf(keywordLogic) }.getOrDefault(KeywordLogic.AND),
             recipientPhoneNumber = recipientPhoneNumber,
             messageTemplate = messageTemplate,
-            isActive = isActive
+            isActive = isActive,
+            isSummationEnabled = isSummationEnabled,
+            startMonthOffset = startMonthOffset,
+            startDayType = startDayType,
+            startDayValue = startDayValue,
+            endMonthOffset = endMonthOffset,
+            endDayType = endDayType,
+            endDayValue = endDayValue,
+            monthlyTotal = monthlyTotal,
+            yearlyTotal = yearlyTotal,
+            lastMonthlyResetTime = lastMonthlyResetTime,
+            lastYearlyResetTime = lastYearlyResetTime,
+            displayOrder = displayOrder
         )
     }
 
@@ -49,7 +73,19 @@ data class FilterEntity(
                 keywordLogic = filter.keywordLogic.name,
                 recipientPhoneNumber = filter.recipientPhoneNumber,
                 messageTemplate = filter.messageTemplate,
-                isActive = filter.isActive
+                isActive = filter.isActive,
+                isSummationEnabled = filter.isSummationEnabled,
+                startMonthOffset = filter.startMonthOffset,
+                startDayType = filter.startDayType,
+                startDayValue = filter.startDayValue,
+                endMonthOffset = filter.endMonthOffset,
+                endDayType = filter.endDayType,
+                endDayValue = filter.endDayValue,
+                monthlyTotal = filter.monthlyTotal,
+                yearlyTotal = filter.yearlyTotal,
+                lastMonthlyResetTime = filter.lastMonthlyResetTime,
+                lastYearlyResetTime = filter.lastYearlyResetTime,
+                displayOrder = filter.displayOrder
             )
         }
     }

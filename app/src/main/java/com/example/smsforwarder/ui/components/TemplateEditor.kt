@@ -62,7 +62,11 @@ fun TemplateEditor(
             title = "[신한카드] 승인",
             body = "김*우 15,400원 일시불 08/04 20:45",
             subText = "체크카드 잔액 125,000원",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            monthlyTotal = 1250000L,
+            yearlyTotal = 15000000L,
+            monthlyPeriodLabel = java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA).format(java.util.Date()),
+            yearlyPeriodLabel = java.text.SimpleDateFormat("yy", java.util.Locale.KOREA).format(java.util.Date())
         )
     }
 

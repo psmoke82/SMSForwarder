@@ -37,6 +37,11 @@ class LogDao_Impl(private val __db: RoomDatabase) : LogDao {
             val _recipientNumber = _cursor.getColumnIndexOrThrow("recipientNumber")
             val _isSuccess = _cursor.getColumnIndexOrThrow("isSuccess")
             val _errorMessage = _cursor.getColumnIndexOrThrow("errorMessage")
+            val _isSummationEnabled = _cursor.getColumnIndex("isSummationEnabled")
+            val _extractedAmountKRW = _cursor.getColumnIndex("extractedAmountKRW")
+            val _originalCurrencyCode = _cursor.getColumnIndex("originalCurrencyCode")
+            val _originalForeignAmount = _cursor.getColumnIndex("originalForeignAmount")
+            val _appliedExchangeRate = _cursor.getColumnIndex("appliedExchangeRate")
 
             while (_cursor.moveToNext()) {
                 val _item = LogEntity(
@@ -50,7 +55,12 @@ class LogDao_Impl(private val __db: RoomDatabase) : LogDao {
                     parsedMessage = _cursor.getString(_parsedMessage),
                     recipientNumber = _cursor.getString(_recipientNumber),
                     isSuccess = _cursor.getInt(_isSuccess) != 0,
-                    errorMessage = if (_cursor.isNull(_errorMessage)) null else _cursor.getString(_errorMessage)
+                    errorMessage = if (_cursor.isNull(_errorMessage)) null else _cursor.getString(_errorMessage),
+                    isSummationEnabled = if (_isSummationEnabled != -1) _cursor.getInt(_isSummationEnabled) != 0 else false,
+                    extractedAmountKRW = if (_extractedAmountKRW != -1) _cursor.getLong(_extractedAmountKRW) else 0L,
+                    originalCurrencyCode = if (_originalCurrencyCode != -1 && !_cursor.isNull(_originalCurrencyCode)) _cursor.getString(_originalCurrencyCode) else null,
+                    originalForeignAmount = if (_originalForeignAmount != -1 && !_cursor.isNull(_originalForeignAmount)) _cursor.getDouble(_originalForeignAmount) else null,
+                    appliedExchangeRate = if (_appliedExchangeRate != -1 && !_cursor.isNull(_appliedExchangeRate)) _cursor.getDouble(_appliedExchangeRate) else null
                 )
                 _result.add(_item)
             }
@@ -68,7 +78,7 @@ class LogDao_Impl(private val __db: RoomDatabase) : LogDao {
     }
 
     override suspend fun insertRawLog(log: LogEntity): Long = withContext(Dispatchers.IO) {
-        val _sql = "INSERT INTO forward_logs (timestamp, filterName, appName, packageName, rawTitle, rawBody, parsedMessage, recipientNumber, isSuccess, errorMessage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        val _sql = "INSERT INTO forward_logs (timestamp, filterName, appName, packageName, rawTitle, rawBody, parsedMessage, recipientNumber, isSuccess, errorMessage, isSummationEnabled, extractedAmountKRW, originalCurrencyCode, originalForeignAmount, appliedExchangeRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         val _stmt: SupportSQLiteStatement = __db.compileStatement(_sql)
         _stmt.bindLong(1, log.timestamp)
         _stmt.bindString(2, log.filterName)
@@ -84,6 +94,23 @@ class LogDao_Impl(private val __db: RoomDatabase) : LogDao {
         } else {
             _stmt.bindString(10, log.errorMessage)
         }
+        _stmt.bindLong(11, if (log.isSummationEnabled) 1L else 0L)
+        _stmt.bindLong(12, log.extractedAmountKRW)
+        if (log.originalCurrencyCode == null) {
+            _stmt.bindNull(13)
+        } else {
+            _stmt.bindString(13, log.originalCurrencyCode)
+        }
+        if (log.originalForeignAmount == null) {
+            _stmt.bindNull(14)
+        } else {
+            _stmt.bindDouble(14, log.originalForeignAmount)
+        }
+        if (log.appliedExchangeRate == null) {
+            _stmt.bindNull(15)
+        } else {
+            _stmt.bindDouble(15, log.appliedExchangeRate)
+        }
 
         val result: Long
         __db.beginTransaction()
@@ -98,7 +125,7 @@ class LogDao_Impl(private val __db: RoomDatabase) : LogDao {
     }
 
     override suspend fun pruneOldLogs(): Unit = withContext(Dispatchers.IO) {
-        val _sql = "DELETE FROM forward_logs WHERE id NOT IN (SELECT id FROM forward_logs ORDER BY timestamp DESC LIMIT 200)"
+        val _sql = "DELETE FROM forward_logs WHERE id NOT IN (SELECT id FROM forward_logs ORDER BY timestamp DESC LIMIT 20000)"
         val _stmt = __db.compileStatement(_sql)
         __db.beginTransaction()
         try {

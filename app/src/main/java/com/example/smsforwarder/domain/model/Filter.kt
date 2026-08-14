@@ -10,7 +10,19 @@ data class Filter(
     val keywordLogic: KeywordLogic = KeywordLogic.OR,
     val recipientPhoneNumber: String,
     val messageTemplate: String,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val isSummationEnabled: Boolean = false,
+    val startMonthOffset: Int = 0,
+    val startDayType: String = "SPECIFIC_DAY",
+    val startDayValue: Int = 1,
+    val endMonthOffset: Int = 0,
+    val endDayType: String = "SPECIFIC_DAY",
+    val endDayValue: Int = 31,
+    val monthlyTotal: Long = 0L,
+    val yearlyTotal: Long = 0L,
+    val lastMonthlyResetTime: Long = 0L,
+    val lastYearlyResetTime: Long = 0L,
+    val displayOrder: Int = 0
 ) {
     val targetPackageName: String
         get() = targetPackageNames.firstOrNull() ?: ""
