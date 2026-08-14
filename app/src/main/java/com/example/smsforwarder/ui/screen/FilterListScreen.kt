@@ -589,23 +589,6 @@ fun FilterItemCard(
                                 fontWeight = FontWeight.Bold
                             )
                         )
-                        if (filter.isSummationEnabled) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Surface(
-                                shape = MaterialTheme.shapes.extraSmall,
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                val monthlyPeriodLabel = remember(filter.lastMonthlyResetTime, filter.startDayType, filter.startDayValue, filter.startMonthOffset) {
-                                    com.example.smsforwarder.domain.parser.SummationPeriodEngine.getMonthlyPeriodLabel(filter)
-                                }
-                                Text(
-                                    text = "${monthlyPeriodLabel}월 ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(filter.monthlyTotal)}원",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -618,7 +601,32 @@ fun FilterItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            if (filter.isSummationEnabled) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 32.dp)
+                        .clickable { onClickDetail() }
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.extraSmall,
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        val monthlyPeriodLabel = remember(filter.lastMonthlyResetTime, filter.startDayType, filter.startDayValue, filter.startMonthOffset) {
+                            com.example.smsforwarder.domain.parser.SummationPeriodEngine.getMonthlyPeriodLabel(filter)
+                        }
+                        Text(
+                            text = "${monthlyPeriodLabel}월 ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(filter.monthlyTotal)}원",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(3.dp))
 
             Row(
                 modifier = Modifier

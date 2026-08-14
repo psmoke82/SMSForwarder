@@ -65,10 +65,14 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smsforwarder.domain.model.Filter
@@ -117,6 +121,7 @@ fun FilterEditScreen(
     var initialMonthlyTotal by remember { mutableStateOf(0L) }
     var initialYearlyTotal by remember { mutableStateOf(0L) }
     var wasSummationEnabledInitially by remember { mutableStateOf(false) }
+    var displayOrder by remember { mutableStateOf(-1) }
 
     var showAppPickerDialog by remember { mutableStateOf(false) }
 
@@ -208,13 +213,14 @@ fun FilterEditScreen(
                 endDayValueText = existingFilter.endDayValue.toString()
                 monthlyTotal = existingFilter.monthlyTotal
                 yearlyTotal = existingFilter.yearlyTotal
-                monthlyTotalText = if (existingFilter.monthlyTotal == 0L) "0" else java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(existingFilter.monthlyTotal)
-                yearlyTotalText = if (existingFilter.yearlyTotal == 0L) "0" else java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(existingFilter.yearlyTotal)
+                monthlyTotalText = if (existingFilter.monthlyTotal == 0L) "0" else existingFilter.monthlyTotal.toString()
+                yearlyTotalText = if (existingFilter.yearlyTotal == 0L) "0" else existingFilter.yearlyTotal.toString()
                 lastMonthlyResetTime = existingFilter.lastMonthlyResetTime
                 lastYearlyResetTime = existingFilter.lastYearlyResetTime
                 initialMonthlyTotal = existingFilter.monthlyTotal
                 initialYearlyTotal = existingFilter.yearlyTotal
                 wasSummationEnabledInitially = existingFilter.isSummationEnabled
+                displayOrder = existingFilter.displayOrder
             }
         }
     }
@@ -250,6 +256,9 @@ fun FilterEditScreen(
                 keywords.add(trimmedKeyword)
             }
 
+            val currentMaxOrder = viewModel.filters.value.maxOfOrNull { it.displayOrder } ?: -1
+            val finalDisplayOrder = if (displayOrder >= 0) displayOrder else currentMaxOrder + 1
+
             val baseFilter = Filter(
                 id = if (filterId > 0) filterId else 0L,
                 name = name.trim(),
@@ -271,7 +280,8 @@ fun FilterEditScreen(
                 monthlyTotal = monthlyTotal,
                 yearlyTotal = yearlyTotal,
                 lastMonthlyResetTime = lastMonthlyResetTime,
-                lastYearlyResetTime = lastYearlyResetTime
+                lastYearlyResetTime = lastYearlyResetTime,
+                displayOrder = finalDisplayOrder
             )
 
             // 사용자가 실제로 "직접 수정"한 합계만 현재 구간의 새 기준값으로 확정한다.
@@ -920,14 +930,15 @@ fun FilterEditScreen(
                         OutlinedTextField(
                             value = monthlyTotalText,
                             onValueChange = { input ->
-                                val formatted = formatWithCommaString(input)
-                                monthlyTotalText = formatted
-                                monthlyTotal = parseLongFromCommaString(formatted)
+                                val digits = input.filter { it.isDigit() }
+                                monthlyTotalText = digits
+                                monthlyTotal = digits.toLongOrNull() ?: 0L
                             },
                             label = { Text("월간 합계 직접 수정 (원)") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            visualTransformation = remember { NumberCommaTransformation() }
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -957,22 +968,23 @@ fun FilterEditScreen(
                                 )
                             }
 
-                            // Adjustment amount input box (with live comma formatting)
+                            // Adjustment amount input box (with live comma formatting via VisualTransformation)
                             OutlinedTextField(
                                 value = adjustAmountText,
                                 onValueChange = { input ->
-                                    adjustAmountText = formatWithCommaString(input)
+                                    adjustAmountText = input.filter { it.isDigit() }
                                 },
                                 placeholder = { Text("가감 금액 입력", fontSize = 12.sp) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                visualTransformation = remember { NumberCommaTransformation() }
                             )
 
                             // Apply button ('적용')
                             Button(
                                 onClick = {
-                                    val delta = parseLongFromCommaString(adjustAmountText)
+                                    val delta = adjustAmountText.toLongOrNull() ?: 0L
                                     if (delta > 0L) {
                                         val newMonthly = if (isAddition) {
                                             monthlyTotal + delta
@@ -980,11 +992,11 @@ fun FilterEditScreen(
                                             (monthlyTotal - delta).coerceAtLeast(0L)
                                         }
                                         monthlyTotal = newMonthly
-                                        monthlyTotalText = if (newMonthly == 0L) "0" else java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(newMonthly)
+                                        monthlyTotalText = newMonthly.toString()
                                         adjustAmountText = ""
                                     }
                                 },
-                                enabled = parseLongFromCommaString(adjustAmountText) > 0L,
+                                enabled = (adjustAmountText.toLongOrNull() ?: 0L) > 0L,
                                 modifier = Modifier.height(48.dp),
                                 contentPadding = PaddingValues(horizontal = 12.dp)
                             ) {
@@ -1018,14 +1030,15 @@ fun FilterEditScreen(
                         OutlinedTextField(
                             value = yearlyTotalText,
                             onValueChange = { input ->
-                                val formatted = formatWithCommaString(input)
-                                yearlyTotalText = formatted
-                                yearlyTotal = parseLongFromCommaString(formatted)
+                                val digits = input.filter { it.isDigit() }
+                                yearlyTotalText = digits
+                                yearlyTotal = digits.toLongOrNull() ?: 0L
                             },
                             label = { Text("연간 합계 직접 수정 (원)") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            visualTransformation = remember { NumberCommaTransformation() }
                         )
                     }
                 }
@@ -1047,14 +1060,48 @@ fun FilterEditScreen(
     }
 }
 
-private fun formatWithCommaString(rawText: String): String {
-    val digitsOnly = rawText.replace(",", "").filter { it.isDigit() }
-    if (digitsOnly.isEmpty()) return ""
-    val parsed = digitsOnly.toLongOrNull() ?: return digitsOnly
-    return java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(parsed)
+class NumberCommaTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val originalText = text.text
+        if (originalText.isEmpty()) {
+            return TransformedText(text, OffsetMapping.Identity)
+        }
+
+        val formatted = StringBuilder()
+        val offsetMap = mutableListOf<Int>()
+
+        val length = originalText.length
+        for (i in 0 until length) {
+            val digitsFromRight = length - i
+            if (i > 0 && digitsFromRight % 3 == 0) {
+                formatted.append(',')
+            }
+            offsetMap.add(formatted.length)
+            formatted.append(originalText[i])
+        }
+        offsetMap.add(formatted.length) // for end offset
+
+        val transformedString = AnnotatedString(formatted.toString())
+
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                return offsetMap[offset.coerceIn(0, originalText.length)]
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                var orig = 0
+                for (i in 0..originalText.length) {
+                    if (offsetMap[i] <= offset) {
+                        orig = i
+                    } else {
+                        break
+                    }
+                }
+                return orig
+            }
+        }
+
+        return TransformedText(transformedString, offsetMapping)
+    }
 }
 
-private fun parseLongFromCommaString(rawText: String): Long {
-    val digitsOnly = rawText.replace(",", "").filter { it.isDigit() }
-    return digitsOnly.toLongOrNull() ?: 0L
-}

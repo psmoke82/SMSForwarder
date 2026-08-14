@@ -29,7 +29,8 @@ class FilterEvaluator {
         val isNativeSms = packageName.isBlank() ||
                 packageName.equals(NATIVE_SMS_PACKAGE, ignoreCase = true) ||
                 packageName.equals("SMS", ignoreCase = true) ||
-                packageName.equals("기본 문자", ignoreCase = true)
+                packageName.equals("기본 문자", ignoreCase = true) ||
+                packageName.equals("메시지", ignoreCase = true)
 
         val validPackages = filter.targetPackageNames.filter { it.isNotBlank() }
         if (validPackages.isNotEmpty()) {
@@ -39,6 +40,7 @@ class FilterEvaluator {
                 } else if (isNativeSms) {
                     targetPkg.equals(NATIVE_SMS_PACKAGE, ignoreCase = true) ||
                             targetPkg.equals("기본 문자", ignoreCase = true) ||
+                            targetPkg.equals("메시지", ignoreCase = true) ||
                             targetPkg.equals("SMS", ignoreCase = true) ||
                             targetPkg.contains("messaging", ignoreCase = true) ||
                             targetPkg.contains("mms", ignoreCase = true)

@@ -25,4 +25,11 @@ interface FilterMonthlySummaryDao {
      * already used for restoring filters, rather than merging/adding into local data.
      */
     suspend fun restoreSummaries(entries: List<FilterMonthlySummaryEntity>)
+
+    suspend fun deleteSummaryById(id: Long)
+
+    suspend fun deleteSummaryByFilterAndPeriod(filterId: Long, periodLabel: String)
+
+    suspend fun deleteSummariesByFilterId(filterId: Long)
 }
+

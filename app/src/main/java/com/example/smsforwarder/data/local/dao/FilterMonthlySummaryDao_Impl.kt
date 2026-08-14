@@ -112,4 +112,27 @@ class FilterMonthlySummaryDao_Impl(private val __db: RoomDatabase) : FilterMonth
         }
         updateSignal.tryEmit(Unit)
     }
+
+    override suspend fun deleteSummaryById(id: Long): Unit = withContext(Dispatchers.IO) {
+        val stmt = __db.compileStatement("DELETE FROM filter_monthly_summaries WHERE id = ?")
+        stmt.bindLong(1, id)
+        stmt.executeUpdateDelete()
+        updateSignal.tryEmit(Unit)
+    }
+
+    override suspend fun deleteSummaryByFilterAndPeriod(filterId: Long, periodLabel: String): Unit = withContext(Dispatchers.IO) {
+        val stmt = __db.compileStatement("DELETE FROM filter_monthly_summaries WHERE filterId = ? AND periodLabel = ?")
+        stmt.bindLong(1, filterId)
+        stmt.bindString(2, periodLabel)
+        stmt.executeUpdateDelete()
+        updateSignal.tryEmit(Unit)
+    }
+
+    override suspend fun deleteSummariesByFilterId(filterId: Long): Unit = withContext(Dispatchers.IO) {
+        val stmt = __db.compileStatement("DELETE FROM filter_monthly_summaries WHERE filterId = ?")
+        stmt.bindLong(1, filterId)
+        stmt.executeUpdateDelete()
+        updateSignal.tryEmit(Unit)
+    }
 }
+

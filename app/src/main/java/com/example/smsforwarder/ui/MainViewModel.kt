@@ -298,4 +298,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    fun deleteMonthlySummary(filterId: Long, periodLabel: String, summaryId: Long = 0L) {
+        viewModelScope.launch {
+            repository.deleteMonthlySummary(filterId, periodLabel, summaryId)
+            val targetFilter = repository.getFilterById(filterId)
+            if (targetFilter != null && targetFilter.isSummationEnabled) {
+                val currentPeriodLabel = com.example.smsforwarder.domain.parser.SummationPeriodEngine.getMonthlyPeriodLabel(targetFilter)
+                if (periodLabel == currentPeriodLabel) {
+                    repository.saveFilter(targetFilter.copy(monthlyTotal = 0L))
+                }
+            }
+        }
+    }
+
+    fun deleteAllMonthlySummariesForFilter(filterId: Long) {
+        viewModelScope.launch {
+            repository.deleteAllMonthlySummariesForFilter(filterId)
+            val targetFilter = repository.getFilterById(filterId)
+            if (targetFilter != null) {
+                repository.saveFilter(targetFilter.copy(monthlyTotal = 0L, yearlyTotal = 0L))
+            }
+        }
+    }
 }
+

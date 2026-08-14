@@ -95,12 +95,26 @@ class SmsReceiver : BroadcastReceiver() {
         val exchangeRateRepository = com.example.smsforwarder.data.repository.ExchangeRateRepositoryImpl(context)
         val amountExtractor = com.example.smsforwarder.domain.parser.AmountExtractor(exchangeRateRepository)
 
+        val defaultSmsPkg = android.provider.Telephony.Sms.getDefaultSmsPackage(context)
+        val smsAppName = if (!defaultSmsPkg.isNullOrBlank()) {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(defaultSmsPkg, 0)
+                pm.getApplicationLabel(appInfo).toString()
+            } catch (e: Exception) {
+                "메시지"
+            }
+        } else {
+            "메시지"
+        }
+        val actualPackageName = defaultSmsPkg ?: FilterEvaluator.NATIVE_SMS_PACKAGE
+
         var matchedCount = 0
 
         for (initialFilter in activeFilters) {
             val isMatched = filterEvaluator.isMatch(
                 filter = initialFilter,
-                packageName = FilterEvaluator.NATIVE_SMS_PACKAGE,
+                packageName = actualPackageName,
                 title = sender,
                 body = body
             )
@@ -124,6 +138,23 @@ class SmsReceiver : BroadcastReceiver() {
                     }
                     val currentMonthlyCycleStart = engine.getMonthlyCycleStartTimestamp(eventCal, initialFilter)
                     val currentYearlyCycleStart = engine.getYearlyCycleStartTimestamp(timestamp)
+
+                    // 새 구간이 시작되어 이전 구간이 종료되는 경우, 이전 구간의 합산액을 스냅샷으로 확정 저장
+                    if (initialFilter.lastMonthlyResetTime > 0 && initialFilter.lastMonthlyResetTime < currentMonthlyCycleStart && initialFilter.monthlyTotal > 0) {
+                        val prevPeriodLabel = java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA).format(java.util.Date(initialFilter.lastMonthlyResetTime))
+                        database.filterMonthlySummaryDao().restoreSummaries(
+                            listOf(
+                                com.example.smsforwarder.data.local.entity.FilterMonthlySummaryEntity(
+                                    filterId = initialFilter.id,
+                                    filterName = initialFilter.name,
+                                    periodLabel = prevPeriodLabel,
+                                    periodStartTimestamp = initialFilter.lastMonthlyResetTime,
+                                    totalAmount = initialFilter.monthlyTotal
+                                )
+                            )
+                        )
+                    }
+
                     // Atomic DB-side reset-check + increment — avoids the lost-update race
                     // that a separate read/compute/write would have if two matching
                     // messages for this filter arrive at nearly the same time.
@@ -149,7 +180,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                 val meta = NotificationMeta(
                     filterName = currentFilter.name,
-                    appName = "기본 문자",
+                    appName = smsAppName,
                     title = sender,
                     body = body,
                     subText = "SMS 수신",
@@ -170,8 +201,8 @@ class SmsReceiver : BroadcastReceiver() {
                 val logEntity = LogEntity(
                     timestamp = timestamp,
                     filterName = currentFilter.name,
-                    appName = "기본 문자",
-                    packageName = FilterEvaluator.NATIVE_SMS_PACKAGE,
+                    appName = smsAppName,
+                    packageName = actualPackageName,
                     rawTitle = sender,
                     rawBody = body,
                     parsedMessage = parsedMessage,

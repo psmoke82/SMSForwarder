@@ -143,6 +143,23 @@ class SmsNotificationListenerService : NotificationListenerService() {
                     }
                     val currentMonthlyCycleStart = engine.getMonthlyCycleStartTimestamp(eventCal, initialFilter)
                     val currentYearlyCycleStart = engine.getYearlyCycleStartTimestamp(timestamp)
+
+                    // 새 구간이 시작되어 이전 구간이 종료되는 경우, 이전 구간의 합산액을 스냅샷으로 확정 저장
+                    if (initialFilter.lastMonthlyResetTime > 0 && initialFilter.lastMonthlyResetTime < currentMonthlyCycleStart && initialFilter.monthlyTotal > 0) {
+                        val prevPeriodLabel = java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA).format(java.util.Date(initialFilter.lastMonthlyResetTime))
+                        database.filterMonthlySummaryDao().restoreSummaries(
+                            listOf(
+                                com.example.smsforwarder.data.local.entity.FilterMonthlySummaryEntity(
+                                    filterId = initialFilter.id,
+                                    filterName = initialFilter.name,
+                                    periodLabel = prevPeriodLabel,
+                                    periodStartTimestamp = initialFilter.lastMonthlyResetTime,
+                                    totalAmount = initialFilter.monthlyTotal
+                                )
+                            )
+                        )
+                    }
+
                     // Atomic DB-side reset-check + increment — avoids the lost-update race
                     // that a separate read/compute/write would have if two matching
                     // messages for this filter arrive at nearly the same time.

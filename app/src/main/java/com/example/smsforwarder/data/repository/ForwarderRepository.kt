@@ -27,6 +27,8 @@ interface ForwarderRepository {
 
     fun getMonthlySummaries(): Flow<List<MonthlySummaryEntry>>
     suspend fun restoreMonthlySummaries(entries: List<MonthlySummaryEntry>)
+    suspend fun deleteMonthlySummary(filterId: Long, periodLabel: String, summaryId: Long = 0L)
+    suspend fun deleteAllMonthlySummariesForFilter(filterId: Long)
 }
 
 class ForwarderRepositoryImpl(
@@ -121,5 +123,17 @@ class ForwarderRepositoryImpl(
             )
         }
         filterMonthlySummaryDao.restoreSummaries(entities)
+    }
+
+    override suspend fun deleteMonthlySummary(filterId: Long, periodLabel: String, summaryId: Long) {
+        if (summaryId > 0) {
+            filterMonthlySummaryDao.deleteSummaryById(summaryId)
+        } else {
+            filterMonthlySummaryDao.deleteSummaryByFilterAndPeriod(filterId, periodLabel)
+        }
+    }
+
+    override suspend fun deleteAllMonthlySummariesForFilter(filterId: Long) {
+        filterMonthlySummaryDao.deleteSummariesByFilterId(filterId)
     }
 }
