@@ -140,4 +140,20 @@ class AmountExtractorTest {
         val amount = amountExtractor.extractAmountInKRW(message)
         assertEquals(0L, amount)
     }
+
+    @Test
+    fun extractKRWAmount_cancellationGluedToCumulativeNoSeparator_negatesTransactionAmount() = runBlocking {
+        // 광주카드/광주BC 포맷: 거래금액과 "누적" 사이에 공백/줄바꿈이 없어, 누적 총액(100,052원)뿐 아니라
+        // 거래금액(6,500원)까지 ignoreKeyword suffix 윈도우에 걸려 0원으로 스킵되던 회귀 케이스.
+        val message = "[Web발신] [광주BC](신용7442)박상*님 06/21 13:35 일시불 취소 6,500원누적 100,052원GS수퍼수지풍덕천점"
+        val amount = amountExtractor.extractAmountInKRW(message)
+        assertEquals(-6500L, amount)
+    }
+
+    @Test
+    fun extractKRWAmount_gluedCumulativeWithoutCancellation_extractsTransactionAmount() = runBlocking {
+        val message = "[Web발신] [광주카드](신용7442)박상*님 04/22 07:52 일시불 취소 60,490원누적 221,680원(주)와이즐리컴퍼"
+        val amount = amountExtractor.extractAmountInKRW(message)
+        assertEquals(-60490L, amount)
+    }
 }

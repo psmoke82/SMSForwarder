@@ -149,24 +149,19 @@ class AmountExtractor(
         // "누적/잔액" totals on their own line, which must not disqualify the actual
         // payment amount on a preceding/following line.
         val lineStart = (text.lastIndexOf('\n', (startIdx - 1).coerceAtLeast(0)) + 1).coerceAtLeast(0)
-        val lineEndCandidate = text.indexOf('\n', endIdx)
-        val lineEnd = if (lineEndCandidate == -1) text.length else lineEndCandidate
 
-        // Check window before match (up to 20 chars before, same line only)
+        // Prefix-only: every ignoreKeyword (누적/잔액/한도/...) grammatically labels the
+        // number that FOLLOWS it in Korean SMS ("누적 300원", "잔액 125,000원"), never the
+        // number before it. A suffix check was tried previously but broke compact formats
+        // like "6,500원누적 100,052원" (no separator): the trailing "누적" there is the label
+        // for the *next* amount, not a descriptor of this one, yet a suffix window would
+        // wrongly disqualify this match too — silently dropping real transaction/cancellation
+        // amounts. Checking only the prefix still correctly excludes the cumulative-total
+        // number itself, since the label always precedes that number.
         val prefixStart = (startIdx - 20).coerceAtLeast(lineStart)
         val prefix = text.substring(prefixStart, startIdx)
 
-        // Check window after match (up to 15 chars after, same line only)
-        val suffixEnd = (endIdx + 15).coerceAtMost(lineEnd)
-        val suffix = text.substring(endIdx, suffixEnd)
-
-        // If prefix or suffix contains any ignore keyword, skip match
-        for (keyword in ignoreKeywords) {
-            if (prefix.contains(keyword) || suffix.contains(keyword)) {
-                return true
-            }
-        }
-        return false
+        return ignoreKeywords.any { prefix.contains(it) }
     }
 
     private fun isSurroundedByCancellationKeyword(text: String, startIdx: Int, endIdx: Int): Boolean {

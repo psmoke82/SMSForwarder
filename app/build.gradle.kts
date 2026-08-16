@@ -28,7 +28,7 @@ android {
         targetSdk = 35
         val commitCount = getGitCommitCount()
         versionCode = commitCount
-        versionName = "1.2.2"
+        versionName = "1.2.3"
         val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         buildConfigField("String", "BUILD_DATE", "\"$currentDate\"")
 
@@ -51,7 +51,7 @@ android {
 
 androidComponents {
     onVariants { variant ->
-        val fileName = "SMSForwarder-v1.2.2-rel.apk"
+        val fileName = "SMSForwarder-v${android.defaultConfig.versionName}-rel.apk"
         variant.outputs.forEach { output ->
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                 output.outputFileName.set(fileName)
