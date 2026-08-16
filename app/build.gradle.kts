@@ -35,9 +35,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Explicit so release can reuse the same signer (see below) — keeps the
+            // upgrade signature stable across releases without a dedicated release keystore.
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            // No dedicated release keystore exists for this project; past "-rel.apk" builds
+            // were actually assembleDebug output renamed, signed with the local debug
+            // keystore (~/.android/debug.keystore). Wiring the same signingConfig here makes
+            // assembleRelease produce an installable, non-debuggable APK with a matching
+            // signature, so it upgrades in place over previously sideloaded versions instead
+            // of being rejected as unsigned or as a signature mismatch.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
