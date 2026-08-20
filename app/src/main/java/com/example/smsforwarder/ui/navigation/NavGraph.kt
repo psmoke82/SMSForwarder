@@ -168,7 +168,11 @@ fun NavGraph(
                 Spacer(modifier = Modifier.weight(1f))
 
                 Text(
-                    text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) • ${BuildConfig.BUILD_DATE}",
+                    // Marks sideloaded test builds so a debug APK is never mistaken for a
+                    // release one. Keyed off BuildConfig.DEBUG rather than anything manual,
+                    // so it cannot be left switched on by accident when releasing.
+                    text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) • ${BuildConfig.BUILD_DATE}" +
+                        if (BuildConfig.DEBUG) " (*Test ver.)" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)

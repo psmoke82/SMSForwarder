@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   Android 자동 백업(API 30 이하) 대상 제외 규칙.
+   sms_forwarder.db 에는 수신 문자 원문(rawBody), 전달 대상 번호(recipientNumber),
+   결제 금액이 평문으로 저장되므로 자동 백업 대상에서 제외한다.
+   앱 자체 백업/복원 기능(data/backup)이 별도로 존재하므로 기능상 손실은 없다.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="database" path="sms_forwarder.db" />
+    <exclude domain="database" path="sms_forwarder.db-wal" />
+    <exclude domain="database" path="sms_forwarder.db-shm" />
+    <exclude domain="database" path="sms_forwarder.db-journal" />
 </full-backup-content>

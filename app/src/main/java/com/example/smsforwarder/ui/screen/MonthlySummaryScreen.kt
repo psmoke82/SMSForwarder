@@ -90,6 +90,7 @@ private fun buildFilterGroups(
         }
         val currentMonthlyCycleStart = SummationPeriodEngine.getMonthlyCycleStartTimestamp(nowCal, filter)
         val currentPeriodLabel = SummationPeriodEngine.getMonthlyPeriodLabel(filter)
+        val currentYearLabel = SummationPeriodEngine.getYearlyPeriodLabel(filter)
 
         // Calculate earliest period to display
         val earliestDbTime = dbSummaries.minOfOrNull { it.periodStartTimestamp }
@@ -194,7 +195,15 @@ private fun buildFilterGroups(
             .map { (yearLabel, groupMonthEntries) ->
                 YearGroup(
                     yearLabel = yearLabel,
-                    totalAmount = groupMonthEntries.sumOf { it.totalAmount },
+                    // The current year shows the filter's own yearlyTotal — the figure the
+                    // user can edit and the one %ytot% forwards — rather than a sum of the
+                    // rows below it. Earlier years have no stored counterpart (yearlyTotal
+                    // only ever holds the running year), so those stay derived.
+                    totalAmount = if (yearLabel == currentYearLabel) {
+                        filter.yearlyTotal
+                    } else {
+                        groupMonthEntries.sumOf { it.totalAmount }
+                    },
                     months = groupMonthEntries.sortedByDescending { it.periodStartTimestamp }
                 )
             }
@@ -203,7 +212,9 @@ private fun buildFilterGroups(
         FilterGroup(
             filterId = filter.id,
             filterName = filter.name,
-            totalAmount = sortedEntries.sumOf { it.totalAmount },
+            // Summed from the year rows, not the months, so the card header stays consistent
+            // with the yearly figures shown directly beneath it.
+            totalAmount = years.sumOf { it.totalAmount },
             years = years
         )
     }

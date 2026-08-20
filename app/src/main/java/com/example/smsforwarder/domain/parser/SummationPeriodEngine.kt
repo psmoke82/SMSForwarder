@@ -133,19 +133,25 @@ object SummationPeriodEngine {
      * falling back to "now"'s cycle start when a reset hasn't happened yet (lastMonthlyResetTime == 0).
      */
     fun getMonthlyPeriodLabel(filter: Filter, referenceTimestamp: Long = System.currentTimeMillis()): String {
-        val periodStart = if (filter.lastMonthlyResetTime > 0) {
-            filter.lastMonthlyResetTime
-        } else {
-            val eventCal = Calendar.getInstance().apply {
-                timeInMillis = referenceTimestamp
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            getMonthlyCycleStartTimestamp(eventCal, filter)
+        return java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA)
+            .format(Date(getMonthlyPeriodStart(filter, referenceTimestamp)))
+    }
+
+    /**
+     * Start of the filter's currently-accumulating monthly period — the timestamp
+     * getMonthlyPeriodLabel labels. Exposed so callers that need to record the period
+     * itself (e.g. writing the in-progress total into a backup) stay in step with the label.
+     */
+    fun getMonthlyPeriodStart(filter: Filter, referenceTimestamp: Long = System.currentTimeMillis()): Long {
+        if (filter.lastMonthlyResetTime > 0) return filter.lastMonthlyResetTime
+        val eventCal = Calendar.getInstance().apply {
+            timeInMillis = referenceTimestamp
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
-        return java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA).format(Date(periodStart))
+        return getMonthlyCycleStartTimestamp(eventCal, filter)
     }
 
     /**
@@ -159,5 +165,16 @@ object SummationPeriodEngine {
             referenceTimestamp
         }
         return java.text.SimpleDateFormat("yy", java.util.Locale.KOREA).format(Date(periodStart))
+    }
+
+    /**
+     * Start of the filter's currently-accumulating yearly period, the counterpart to
+     * getMonthlyPeriodStart. Unlike getYearlyPeriodLabel's fallback — which only needs a
+     * timestamp somewhere inside the year to format it — this normalizes to Jan 1, so a
+     * restore can write it straight into lastYearlyResetTime.
+     */
+    fun getYearlyPeriodStart(filter: Filter, referenceTimestamp: Long = System.currentTimeMillis()): Long {
+        if (filter.lastYearlyResetTime > 0) return filter.lastYearlyResetTime
+        return getYearlyCycleStartTimestamp(referenceTimestamp)
     }
 }

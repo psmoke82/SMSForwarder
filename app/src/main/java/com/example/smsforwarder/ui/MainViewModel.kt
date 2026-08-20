@@ -16,10 +16,12 @@ import com.example.smsforwarder.data.repository.UserPreferencesRepository
 import com.example.smsforwarder.domain.model.Filter
 import com.example.smsforwarder.domain.model.ForwardLog
 import com.example.smsforwarder.domain.model.MonthlySummaryEntry
+import com.example.smsforwarder.domain.parser.SummationPeriodEngine
 import com.example.smsforwarder.service.ForwarderForegroundService
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -209,23 +211,114 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Persists an imported filter list. Summation amounts and monthly-summary history are
-     * intentionally excluded from backups (see BackupMigrator) — restoring only ever brings
-     * back filter settings, never stale accumulated totals — so there is nothing to remap or
-     * restore beyond the filters themselves.
+     * Reads filters and monthly-summary history straight from the repository instead of the
+     * exposed StateFlows. Those are WhileSubscribed(5000), and nothing on the backup screen
+     * collects `monthlySummaries`, so `.value` there would be the empty initial value — the
+     * export would silently write no history at all.
      */
-    private suspend fun applyImportResult(importResult: com.example.smsforwarder.data.backup.BackupImportResult): Int {
+    private suspend fun snapshotForBackup(): Pair<List<Filter>, List<MonthlySummaryEntry>> {
+        val currentFilters = repository.getAllFilters().first()
+        val currentSummaries = repository.getMonthlySummaries().first()
+        return currentFilters to currentSummaries
+    }
+
+    /**
+     * Persists an imported filter list, then restores its monthly-summary history.
+     *
+     * Summary rows key off the filter's primary key, which is NOT stable across devices: a
+     * restore inserts filters into a fresh table and they can come back with different ids.
+     * saveFilter returns the id actually written, so the old-to-new mapping is built as the
+     * filters land and every summary row is re-pointed through it before being stored —
+     * without that, history would attach to the wrong filter or to none at all.
+     *
+     * Each entry is then routed by period. One whose label matches the period this device is
+     * currently accumulating into is the backup's in-progress total: it goes back onto the
+     * filter as monthlyTotal, which is what the summary screen reads and what the next
+     * rollover snapshots. Any other label is a settled period and is stored as a row.
+     * Yearly totals work the same way against the yearly label, except there is no history
+     * table to fall back on, so a non-matching one is simply dropped.
+     * An in-progress total from an earlier period matches nothing and is discarded either
+     * way, so a restore performed months later never resurrects a stale running total.
+     */
+    private suspend fun applyImportResult(importResult: com.example.smsforwarder.data.backup.BackupImportResult): RestoreCounts {
+        val savedFilterById = mutableMapOf<Long, Filter>()
+        val savedFilterByName = mutableMapOf<String, Filter>()
         importResult.filters.forEach { filter ->
-            repository.saveFilter(filter)
+            val persistedId = repository.saveFilter(filter)
+            if (persistedId > 0) {
+                val persisted = filter.copy(id = persistedId)
+                if (filter.id > 0) savedFilterById[filter.id] = persisted
+                if (filter.name.isNotBlank()) savedFilterByName[filter.name] = persisted
+            }
         }
-        return importResult.filters.size
+
+        // Legacy backups can carry filters with id 0, leaving nothing to key on;
+        // the entry's filterName is then the only link back to its filter.
+        fun resolveTarget(filterId: Long, filterName: String): Filter? =
+            savedFilterById[filterId] ?: savedFilterByName[filterName]
+
+        // Monthly and yearly totals land on the same filter row, so they are collected here
+        // and written once — saving per entry would have the second write overwrite the first.
+        val amountPatches = mutableMapOf<Long, Filter>()
+        val settledRows = mutableListOf<MonthlySummaryEntry>()
+        var restoredInProgressCount = 0
+
+        importResult.monthlySummaries.forEach { entry ->
+            val target = resolveTarget(entry.filterId, entry.filterName) ?: return@forEach
+            // Labels are always derived from `target`, the freshly saved filter whose amounts
+            // and reset timestamps are cleared, so this resolves to the period THIS device is
+            // in right now — never to a period a patch has already written back.
+            if (entry.periodLabel != SummationPeriodEngine.getMonthlyPeriodLabel(target)) {
+                settledRows.add(entry.copy(id = 0L, filterId = target.id))
+                return@forEach
+            }
+            amountPatches[target.id] = (amountPatches[target.id] ?: target).copy(
+                monthlyTotal = entry.totalAmount,
+                lastMonthlyResetTime = entry.periodStartTimestamp.takeIf { it > 0 } ?: 0L
+            )
+            restoredInProgressCount++
+        }
+
+        importResult.yearlySummaries.forEach { entry ->
+            val target = resolveTarget(entry.filterId, entry.filterName) ?: return@forEach
+            // No yearly history table exists, so a total from a previous year has nowhere to
+            // go and nothing to say about this one — it is simply dropped.
+            if (entry.periodLabel != SummationPeriodEngine.getYearlyPeriodLabel(target)) return@forEach
+            amountPatches[target.id] = (amountPatches[target.id] ?: target).copy(
+                yearlyTotal = entry.totalAmount,
+                lastYearlyResetTime = entry.periodStartTimestamp.takeIf { it > 0 } ?: 0L
+            )
+        }
+
+        amountPatches.values.forEach { repository.saveFilter(it) }
+
+        if (settledRows.isNotEmpty()) {
+            repository.restoreMonthlySummaries(settledRows)
+        }
+
+        return RestoreCounts(
+            filterCount = importResult.filters.size,
+            summaryCount = settledRows.size + restoredInProgressCount
+        )
+    }
+
+    data class RestoreCounts(val filterCount: Int, val summaryCount: Int) {
+        /** "3개의 필터" / "3개의 필터와 12건의 금액합산 내역" */
+        fun toMessage(prefix: String = ""): String {
+            val body = if (summaryCount > 0) {
+                "${filterCount}개의 필터와 ${summaryCount}건의 금액합산 내역"
+            } else {
+                "${filterCount}개의 필터"
+            }
+            return "$prefix${body}를 복원했습니다."
+        }
     }
 
     // Local Backup & Restore
     fun exportLocalBackup(uri: Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
-            val currentFilters = filters.value
-            val result = localBackupManager.exportToUri(uri, currentFilters)
+            val (currentFilters, currentSummaries) = snapshotForBackup()
+            val result = localBackupManager.exportToUri(uri, currentFilters, currentSummaries)
             if (result.isSuccess) {
                 onResult(true, null)
             } else {
@@ -238,8 +331,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = localBackupManager.importFromUri(uri)
             if (result.isSuccess) {
-                val count = applyImportResult(result.getOrThrow())
-                onResult(true, "${count}개의 필터가 복원되었습니다.")
+                val counts = applyImportResult(result.getOrThrow())
+                onResult(true, counts.toMessage())
             } else {
                 onResult(false, result.exceptionOrNull()?.localizedMessage)
             }
@@ -249,8 +342,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Google Drive Backup & Restore
     fun uploadDriveBackup(account: GoogleSignInAccount, onResult: (Boolean, String?, Throwable?) -> Unit) {
         viewModelScope.launch {
-            val currentFilters = filters.value
-            val result = googleDriveBackupManager.uploadBackup(account, currentFilters)
+            val (currentFilters, currentSummaries) = snapshotForBackup()
+            val result = googleDriveBackupManager.uploadBackup(account, currentFilters, currentSummaries)
             if (result.isSuccess) {
                 onResult(true, "Google Drive에 백업이 성공적으로 저장되었습니다.", null)
             } else {
@@ -264,8 +357,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = googleDriveBackupManager.downloadBackup(account)
             if (result.isSuccess) {
-                val count = applyImportResult(result.getOrThrow())
-                onResult(true, "Google Drive에서 ${count}개의 필터를 복원했습니다.", null)
+                val counts = applyImportResult(result.getOrThrow())
+                onResult(true, counts.toMessage("Google Drive에서 "), null)
             } else {
                 val ex = result.exceptionOrNull()
                 onResult(false, ex?.localizedMessage ?: ex?.toString(), ex)
@@ -275,8 +368,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun uploadDriveBackupByEmail(accountEmail: String, onResult: (Boolean, String?, Throwable?) -> Unit) {
         viewModelScope.launch {
-            val currentFilters = filters.value
-            val result = googleDriveBackupManager.uploadBackupByEmail(accountEmail, currentFilters)
+            val (currentFilters, currentSummaries) = snapshotForBackup()
+            val result = googleDriveBackupManager.uploadBackupByEmail(accountEmail, currentFilters, currentSummaries)
             if (result.isSuccess) {
                 onResult(true, "Google Drive에 백업이 성공적으로 저장되었습니다.", null)
             } else {
@@ -290,8 +383,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = googleDriveBackupManager.downloadBackupByEmail(accountEmail)
             if (result.isSuccess) {
-                val count = applyImportResult(result.getOrThrow())
-                onResult(true, "Google Drive에서 ${count}개의 필터를 복원했습니다.", null)
+                val counts = applyImportResult(result.getOrThrow())
+                onResult(true, counts.toMessage("Google Drive에서 "), null)
             } else {
                 val ex = result.exceptionOrNull()
                 onResult(false, ex?.localizedMessage ?: ex?.toString(), ex)

@@ -944,7 +944,7 @@ fun FilterEditScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "월간 합계 금액 가감 (조정)",
+                            text = "합계 금액 가감 (조정) · 월간과 연간에 함께 반영",
                             style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -986,13 +986,26 @@ fun FilterEditScreen(
                                 onClick = {
                                     val delta = adjustAmountText.toLongOrNull() ?: 0L
                                     if (delta > 0L) {
+                                        // An adjustment means a payment was missed or counted
+                                        // twice, and that payment sits in the yearly total as
+                                        // well — correcting only the monthly figure leaves the
+                                        // two permanently out of step, which stays invisible
+                                        // because the summary screen derives its yearly figure
+                                        // from the monthly rows rather than reading yearlyTotal.
                                         val newMonthly = if (isAddition) {
                                             monthlyTotal + delta
                                         } else {
                                             (monthlyTotal - delta).coerceAtLeast(0L)
                                         }
+                                        val newYearly = if (isAddition) {
+                                            yearlyTotal + delta
+                                        } else {
+                                            (yearlyTotal - delta).coerceAtLeast(0L)
+                                        }
                                         monthlyTotal = newMonthly
                                         monthlyTotalText = newMonthly.toString()
+                                        yearlyTotal = newYearly
+                                        yearlyTotalText = newYearly.toString()
                                         adjustAmountText = ""
                                     }
                                 },

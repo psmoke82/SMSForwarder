@@ -28,7 +28,7 @@ android {
         targetSdk = 35
         val commitCount = getGitCommitCount()
         versionCode = commitCount
-        versionName = "1.2.3"
+        versionName = "1.2.4"
         val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         buildConfigField("String", "BUILD_DATE", "\"$currentDate\"")
 
