@@ -613,11 +613,32 @@ fun FilterItemCard(
                         shape = MaterialTheme.shapes.extraSmall,
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        val monthlyPeriodLabel = remember(filter.lastMonthlyResetTime, filter.startDayType, filter.startDayValue, filter.startMonthOffset) {
-                            com.example.smsforwarder.domain.parser.SummationPeriodEngine.getMonthlyPeriodLabel(filter)
+                        // 뱃지는 항상 "오늘 날짜 기준 이번 달"을 보여준다 — 아직 그 달에 매칭
+                        // 문자가 안 와서 filter.monthlyTotal이 지난달 값을 들고 있는 중이면
+                        // (라이브 값이 붙어있는 이벤트 기준 기간과 오늘 날짜 기준 기간이 다르면)
+                        // 0원으로 표시한다. 지난달까지의 실제 값은 월별 금액합산 화면에서 확인 가능.
+                        val (monthlyPeriodLabel, monthlyDisplayAmount) = remember(
+                            filter.lastMonthlyResetTime,
+                            filter.monthlyTotal,
+                            filter.startDayType,
+                            filter.startDayValue,
+                            filter.startMonthOffset
+                        ) {
+                            val engine = com.example.smsforwarder.domain.parser.SummationPeriodEngine
+                            val todayCal = java.util.Calendar.getInstance().apply {
+                                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                set(java.util.Calendar.MINUTE, 0)
+                                set(java.util.Calendar.SECOND, 0)
+                                set(java.util.Calendar.MILLISECOND, 0)
+                            }
+                            val todayCycleStart = engine.getMonthlyCycleStartTimestamp(todayCal, filter)
+                            val todayLabel = java.text.SimpleDateFormat("yy.MM", java.util.Locale.KOREA).format(java.util.Date(todayCycleStart))
+                            val liveLabel = engine.getMonthlyPeriodLabel(filter)
+                            val amount = if (todayLabel == liveLabel) filter.monthlyTotal else 0L
+                            todayLabel to amount
                         }
                         Text(
-                            text = "${monthlyPeriodLabel}월 ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(filter.monthlyTotal)}원",
+                            text = "${monthlyPeriodLabel}월 ${java.text.NumberFormat.getNumberInstance(java.util.Locale.KOREA).format(monthlyDisplayAmount)}원",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer

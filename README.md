@@ -57,9 +57,10 @@
 ```text
 com.example.smsforwarder
 ├── data
+│   ├── backup (LocalBackupManager, GoogleDriveBackupManager, BackupMigrator)
 │   ├── local (Room Database, Entity, DAO)
-│   ├── model (BackupPayload 등)
-│   └── repository (ForwarderRepository, UserPreferencesRepository)
+│   ├── model (BackupPayload, YearlyTotalBackupEntry 등)
+│   └── repository (ForwarderRepository, UserPreferencesRepository, ExchangeRateRepository)
 ├── domain
 │   ├── model (Filter, ForwardLog 등 도메인 객체)
 │   └── parser (FilterEvaluator, TemplateParser, MessageDeduplicator)

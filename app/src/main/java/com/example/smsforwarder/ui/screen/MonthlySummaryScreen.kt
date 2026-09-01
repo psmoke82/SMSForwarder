@@ -231,10 +231,24 @@ fun MonthlySummaryScreen(
     val filters by viewModel.filters.collectAsState()
     val filterGroups = remember(filters, summaries) { buildFilterGroups(filters, summaries) }
 
+    // "(집계중)" 배지는 오늘 날짜 기준 현재 달에 붙인다 — 각 행의 금액(buildFilterGroups)은
+    // 여전히 이벤트(마지막 리셋 시각) 기준으로 채워지므로, 아직 이번 달 결제 문자가 안 온
+    // 필터는 지난달 행이 실제 라이브 합계를 보여주되 굵게 표시되지는 않고, 이번 달 행은
+    // 0원으로 굵게 표시된다.
     val currentPeriodLabelByFilterId = remember(filters) {
+        val todayCal = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val periodFormat = SimpleDateFormat("yy.MM", Locale.KOREA)
         filters
             .filter { it.isSummationEnabled && it.isActive }
-            .associate { it.id to SummationPeriodEngine.getMonthlyPeriodLabel(it) }
+            .associate { filter ->
+                val todayCycleStart = SummationPeriodEngine.getMonthlyCycleStartTimestamp(todayCal, filter)
+                filter.id to periodFormat.format(Date(todayCycleStart))
+            }
     }
 
     val expandedFilters = remember { mutableStateMapOf<Long, Boolean>() }
@@ -495,7 +509,7 @@ private fun FilterGroupCard(
                                             text = if (isCurrent) {
                                                 "${month.periodLabel} (집계중)"
                                             } else {
-                                                month.periodLabel
+                                                "${month.periodLabel} (집계완료)"
                                             },
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontSize = 13.5.sp,
