@@ -1,5 +1,6 @@
 package com.example.smsforwarder.ui.navigation
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -52,8 +53,13 @@ sealed class Screen(val route: String) {
     object FilterEdit : Screen("filter_edit?filterId={filterId}") {
         fun createRoute(filterId: Long = 0L) = "filter_edit?filterId=$filterId"
     }
-    object LogList : Screen("log_list")
-    object MonthlySummary : Screen("monthly_summary")
+    object LogList : Screen("log_list?filterName={filterName}") {
+        fun createRoute(filterName: String? = null) =
+            "log_list" + (filterName?.let { "?filterName=${Uri.encode(it)}" } ?: "")
+    }
+    object MonthlySummary : Screen("monthly_summary?filterId={filterId}") {
+        fun createRoute(filterId: Long = 0L) = "monthly_summary?filterId=$filterId"
+    }
     object ExecutionMode : Screen("execution_mode")
     object BackupRestore : Screen("backup_restore")
 }
@@ -61,13 +67,18 @@ sealed class Screen(val route: String) {
 @Composable
 fun NavGraph(
     navController: NavHostController = rememberNavController(),
-    viewModel: MainViewModel = viewModel()
+    viewModel: MainViewModel = viewModel(),
+    startRoute: String? = null
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    // Compares only the path segment, ignoring query args (e.g. filterName/filterId), so a
+    // widget-launched deep link into log_list/monthly_summary still highlights the matching
+    // drawer item and isn't treated as "different screen, navigate again" on repeat taps.
+    val currentBaseRoute = currentRoute?.substringBefore("?")
 
     val configuration = LocalConfiguration.current
     val drawerWidth = (configuration.screenWidthDp * 0.825f).dp
@@ -79,7 +90,7 @@ fun NavGraph(
 
     val navigateFromDrawer: (String) -> Unit = { targetRoute ->
         coroutineScope.launch { drawerState.close() }
-        if (currentRoute != targetRoute) {
+        if (currentBaseRoute != targetRoute.substringBefore("?")) {
             if (targetRoute == Screen.FilterList.route) {
                 navController.navigate(Screen.FilterList.route) {
                     popUpTo(Screen.FilterList.route) { inclusive = false }
@@ -144,16 +155,16 @@ fun NavGraph(
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.History, contentDescription = null) },
                     label = { Text("포워딩 로그 확인") },
-                    selected = currentRoute == Screen.LogList.route,
-                    onClick = { navigateFromDrawer(Screen.LogList.route) },
+                    selected = currentBaseRoute == Screen.LogList.route.substringBefore("?"),
+                    onClick = { navigateFromDrawer(Screen.LogList.createRoute()) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
                     label = { Text("월간 금액합산 확인") },
-                    selected = currentRoute == Screen.MonthlySummary.route,
-                    onClick = { navigateFromDrawer(Screen.MonthlySummary.route) },
+                    selected = currentBaseRoute == Screen.MonthlySummary.route.substringBefore("?"),
+                    onClick = { navigateFromDrawer(Screen.MonthlySummary.createRoute()) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
 
@@ -182,7 +193,7 @@ fun NavGraph(
     ) {
         NavHost(
             navController = navController,
-            startDestination = Screen.FilterList.route
+            startDestination = startRoute ?: Screen.FilterList.route
         ) {
             composable(Screen.FilterList.route) {
                 FilterListScreen(
@@ -197,7 +208,7 @@ fun NavGraph(
                         navController.navigate(Screen.FilterEdit.createRoute(filterId))
                     },
                     onNavigateToLogs = {
-                        navigateFromDrawer(Screen.LogList.route)
+                        navigateFromDrawer(Screen.LogList.createRoute())
                     },
                     onNavigateToSettings = {
                         navigateFromDrawer(Screen.ExecutionMode.route)
@@ -222,16 +233,37 @@ fun NavGraph(
                 )
             }
 
-            composable(Screen.LogList.route) {
+            composable(
+                route = Screen.LogList.route,
+                arguments = listOf(
+                    navArgument("filterName") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val filterName = backStackEntry.arguments?.getString("filterName")
                 LogListScreen(
                     viewModel = viewModel,
+                    initialFilterName = filterName,
                     onNavigateBack = safePopBack
                 )
             }
 
-            composable(Screen.MonthlySummary.route) {
+            composable(
+                route = Screen.MonthlySummary.route,
+                arguments = listOf(
+                    navArgument("filterId") {
+                        type = NavType.LongType
+                        defaultValue = 0L
+                    }
+                )
+            ) { backStackEntry ->
+                val filterId = backStackEntry.arguments?.getLong("filterId") ?: 0L
                 MonthlySummaryScreen(
                     viewModel = viewModel,
+                    initialFilterId = filterId,
                     onNavigateBack = safePopBack
                 )
             }

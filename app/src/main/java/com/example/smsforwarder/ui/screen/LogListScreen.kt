@@ -66,12 +66,16 @@ import java.util.Locale
 @Composable
 fun LogListScreen(
     viewModel: MainViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    initialFilterName: String? = null
 ) {
     val logs by viewModel.logs.collectAsState()
     val context = LocalContext.current
     var showClearDialog by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    // Seeds the search field with the widget-selected filter name so a widget tap opens
+    // this screen already narrowed to that filter, reusing the existing search/filter UI
+    // rather than adding a separate filter-chip mechanism.
+    var searchQuery by remember { mutableStateOf(initialFilterName ?: "") }
 
     val filteredLogs by remember {
         derivedStateOf {

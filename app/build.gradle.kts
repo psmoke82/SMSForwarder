@@ -28,7 +28,7 @@ android {
         targetSdk = 35
         val commitCount = getGitCommitCount()
         versionCode = commitCount
-        versionName = "1.2.5"
+        versionName = "1.2.6"
         val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         buildConfigField("String", "BUILD_DATE", "\"$currentDate\"")
 
@@ -88,6 +88,8 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.core.ktx)

@@ -224,12 +224,14 @@ private fun buildFilterGroups(
 @Composable
 fun MonthlySummaryScreen(
     viewModel: MainViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    initialFilterId: Long = 0L
 ) {
     val context = LocalContext.current
     val summaries by viewModel.monthlySummaries.collectAsState()
     val filters by viewModel.filters.collectAsState()
     val filterGroups = remember(filters, summaries) { buildFilterGroups(filters, summaries) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
 
     // "(집계중)" 배지는 오늘 날짜 기준 현재 달에 붙인다 — 각 행의 금액(buildFilterGroups)은
     // 여전히 이벤트(마지막 리셋 시각) 기준으로 채워지므로, 아직 이번 달 결제 문자가 안 온
@@ -269,6 +271,16 @@ fun MonthlySummaryScreen(
                 if (!expandedYears.containsKey(yearKey)) {
                     expandedYears[yearKey] = true
                 }
+            }
+        }
+    }
+
+    // Scrolls to the widget-selected filter's card, if any, once the list is populated.
+    LaunchedEffect(filterGroups, initialFilterId) {
+        if (initialFilterId > 0) {
+            val index = filterGroups.indexOfFirst { it.filterId == initialFilterId }
+            if (index >= 0) {
+                listState.animateScrollToItem(index)
             }
         }
     }
@@ -368,6 +380,7 @@ fun MonthlySummaryScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),

@@ -217,6 +217,7 @@ class SmsReceiver : BroadcastReceiver() {
                 )
 
                 database.logDao().insertLog(logEntity)
+                com.example.smsforwarder.widget.WidgetUpdater.notifyLogInserted(context, currentFilter.name)
                 Log.i(tag, "[4단계: 포워딩 처리 완료] 필터 '${currentFilter.name}' SMS 전송 결과: ${if (sendResult.isSuccess) "성공" else "실패"}")
             }
         }

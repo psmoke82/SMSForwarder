@@ -65,15 +65,32 @@ class MainActivity : ComponentActivity() {
         // Request required runtime permissions immediately on app launch
         requestRequiredPermissions(forceOpenSettingsIfDenied = false)
 
+        val startRoute = resolveWidgetStartRoute(intent)
+
         setContent {
             SMSForwarderTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NavGraph(viewModel = mainViewModel)
+                    NavGraph(viewModel = mainViewModel, startRoute = startRoute)
                 }
             }
+        }
+    }
+
+    /** Maps a widget-tap launch Intent (see [com.example.smsforwarder.widget.WidgetNavKeys]) to a nav route, or null for a normal app launch. */
+    private fun resolveWidgetStartRoute(intent: Intent): String? {
+        return when (intent.getStringExtra(com.example.smsforwarder.widget.WidgetNavKeys.EXTRA_TARGET)) {
+            com.example.smsforwarder.widget.WidgetNavKeys.TARGET_LOG_LIST ->
+                com.example.smsforwarder.ui.navigation.Screen.LogList.createRoute(
+                    intent.getStringExtra(com.example.smsforwarder.widget.WidgetNavKeys.EXTRA_FILTER_NAME)
+                )
+            com.example.smsforwarder.widget.WidgetNavKeys.TARGET_MONTHLY_SUMMARY ->
+                com.example.smsforwarder.ui.navigation.Screen.MonthlySummary.createRoute(
+                    intent.getLongExtra(com.example.smsforwarder.widget.WidgetNavKeys.EXTRA_FILTER_ID, 0L)
+                )
+            else -> null
         }
     }
 

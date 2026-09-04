@@ -149,4 +149,27 @@ class LogDao_Impl(private val __db: RoomDatabase) : LogDao {
         }
         updateSignal.tryEmit(Unit)
     }
+
+    override suspend fun getLogCounts(filterName: String?, sinceTimestamp: Long): LogCountResult = withContext(Dispatchers.IO) {
+        val _sql = buildString {
+            append("SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN isSuccess = 1 THEN 1 ELSE 0 END), 0) AS successCount FROM forward_logs WHERE timestamp >= ?")
+            if (filterName != null) append(" AND filterName = ?")
+        }
+        val _argCount = if (filterName != null) 2 else 1
+        val _statement = RoomSQLiteQuery.acquire(_sql, _argCount)
+        _statement.bindLong(1, sinceTimestamp)
+        if (filterName != null) {
+            _statement.bindString(2, filterName)
+        }
+        val _cursor: Cursor = __db.query(_statement)
+        try {
+            _cursor.moveToFirst()
+            val total = _cursor.getInt(_cursor.getColumnIndexOrThrow("total"))
+            val successCount = _cursor.getInt(_cursor.getColumnIndexOrThrow("successCount"))
+            LogCountResult(total, successCount)
+        } finally {
+            _cursor.close()
+            _statement.release()
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.example.smsforwarder.data.repository
 
 import com.example.smsforwarder.data.local.dao.FilterDao
 import com.example.smsforwarder.data.local.dao.FilterMonthlySummaryDao
+import com.example.smsforwarder.data.local.dao.LogCountResult
 import com.example.smsforwarder.data.local.dao.LogDao
 import com.example.smsforwarder.data.local.entity.FilterEntity
 import com.example.smsforwarder.data.local.entity.FilterMonthlySummaryEntity
@@ -24,6 +25,7 @@ interface ForwarderRepository {
     fun getAllLogs(): Flow<List<ForwardLog>>
     suspend fun addLog(log: ForwardLog): Long
     suspend fun clearLogs()
+    suspend fun getLogCounts(filterName: String?, sinceTimestamp: Long): LogCountResult
 
     fun getMonthlySummaries(): Flow<List<MonthlySummaryEntry>>
     suspend fun restoreMonthlySummaries(entries: List<MonthlySummaryEntry>)
@@ -104,6 +106,10 @@ class ForwarderRepositoryImpl(
 
     override suspend fun clearLogs() {
         logDao.clearLogs()
+    }
+
+    override suspend fun getLogCounts(filterName: String?, sinceTimestamp: Long): LogCountResult {
+        return logDao.getLogCounts(filterName, sinceTimestamp)
     }
 
     override fun getMonthlySummaries(): Flow<List<MonthlySummaryEntry>> {

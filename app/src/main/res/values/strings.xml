@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">SMSForwarder</string>
+    <string name="widget_count_description">필터/기간별 재전송 건수를 홈 화면에서 확인합니다.</string>
+    <string name="widget_amount_description">필터별 이번 합산기간 누적 금액을 홈 화면에서 확인합니다.</string>
 </resources>

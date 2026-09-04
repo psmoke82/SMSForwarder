@@ -155,6 +155,23 @@ object SummationPeriodEngine {
     }
 
     /**
+     * "MM.dd ~ MM.dd" range label for the filter's currently-accumulating monthly period —
+     * used where a compact "yy.MM" label isn't enough (e.g. widget UI) to show a custom
+     * (non-1st-of-month) cycle's actual start/end dates. Derived from the same cycle-start
+     * timestamp as getMonthlyPeriodLabel, one cycle forward minus a day for the end.
+     */
+    fun getMonthlyPeriodRangeLabel(filter: Filter, referenceTimestamp: Long = System.currentTimeMillis()): String {
+        val startMillis = getMonthlyPeriodStart(filter, referenceTimestamp)
+        val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
+        val endCal = (startCal.clone() as Calendar).apply {
+            add(Calendar.MONTH, 1)
+            add(Calendar.DAY_OF_MONTH, -1)
+        }
+        val format = java.text.SimpleDateFormat("MM.dd", java.util.Locale.KOREA)
+        return "${format.format(startCal.time)} ~ ${format.format(endCal.time)}"
+    }
+
+    /**
      * Human-readable label for the filter's current yearly period, e.g. "26" —
      * derived from lastYearlyResetTime, falling back to "now"'s year when unset.
      */
